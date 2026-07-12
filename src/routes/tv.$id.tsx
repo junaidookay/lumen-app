@@ -1,0 +1,86 @@
+import { useState } from "react";
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
+import { AppShell } from "@/components/layout/AppShell";
+import { TVHero } from "@/components/detail/TVHero";
+import { MetadataPanel } from "@/components/detail/MetadataPanel";
+import { CastCard } from "@/components/detail/CastCard";
+import { ReviewCard } from "@/components/detail/ReviewCard";
+import { GalleryCarousel } from "@/components/detail/GalleryCarousel";
+import { SeasonSelector } from "@/components/tv/SeasonSelector";
+import { EpisodeList } from "@/components/tv/EpisodeList";
+import { RecommendationRow, SimilarContentRow } from "@/components/sections/RecommendationRow";
+import { showQuery, seasonQuery } from "@/services/content";
+
+export const Route = createFileRoute("/tv/$id")({
+  loader: async ({ params, context }) => {
+    try {
+      await context.queryClient.ensureQueryData(showQuery(params.id));
+    } catch {
+      throw notFound();
+    }
+  },
+  head: () => ({ meta: [{ title: "Series — Lumen" }] }),
+  component: TVDetail,
+});
+
+function TVDetail() {
+  const { id } = Route.useParams();
+  const { data } = useSuspenseQuery(showQuery(id));
+  const show = data.item;
+  const similar = data.similar;
+  const recs = data.recommendations;
+  const [activeSeason, setActiveSeason] = useState(1);
+  const seasons = show.seasons ?? [];
+  const seasonNumber = seasons.find((s) => s.seasonNumber === activeSeason)?.seasonNumber ?? seasons[0]?.seasonNumber ?? 1;
+  const seasonDetail = useQuery(seasonQuery(show.id, seasonNumber));
+  const season = seasonDetail.data ?? seasons.find((s) => s.seasonNumber === seasonNumber);
+
+  return (
+    <AppShell>
+      <TVHero item={show} />
+
+      <div className="mx-auto max-w-[1400px] space-y-16 px-4 py-16 sm:px-6 lg:px-10">
+        {show.cast.length > 0 && (
+          <section>
+            <h2 className="mb-4 text-2xl font-semibold tracking-tight">Cast</h2>
+            <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
+              {show.cast.map((c: any, i: number) => <CastCard key={c.id} member={c} index={i} />)}
+            </div>
+          </section>
+        )}
+
+        {seasons.length > 0 && season && (
+          <section>
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-2xl font-semibold tracking-tight">Episodes</h2>
+              <SeasonSelector seasons={seasons} activeSeason={activeSeason} onChange={setActiveSeason} />
+            </div>
+            <EpisodeList episodes={season.episodes} keyId={`${show.id}-s${activeSeason}`} />
+          </section>
+        )}
+
+        <section>
+          <h2 className="mb-4 text-2xl font-semibold tracking-tight">Details</h2>
+          <MetadataPanel item={show} />
+        </section>
+      </div>
+
+      {show.gallery?.length ? <GalleryCarousel images={show.gallery} /> : null}
+
+      {show.reviews?.length ? (
+        <section className="mx-auto max-w-[1400px] px-4 py-16 sm:px-6 lg:px-10">
+          <h2 className="mb-4 text-2xl font-semibold tracking-tight">Reviews</h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            {show.reviews.slice(0, 4).map((r: any) => <ReviewCard key={r.id} review={r} />)}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="space-y-12 py-8">
+        <SimilarContentRow items={similar} />
+        <RecommendationRow title="Recommended for you" items={recs} />
+      </div>
+    </AppShell>
+  );
+}
