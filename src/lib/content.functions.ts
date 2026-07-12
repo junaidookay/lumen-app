@@ -120,7 +120,7 @@ function sortToTMDB(sort: DiscoverInput["sort"], kind: "movie" | "tv"): string {
 }
 
 export const runDiscover = createServerFn({ method: "GET" })
-  .inputValidator((raw: unknown) => discoverInput.parse(raw))
+  .validator((raw: unknown) => discoverInput.parse(raw))
   .handler(async ({ data }) => {
     const { discover } = await import("./tmdb/repositories.server");
     const { mapListItems } = await import("./tmdb/mappers");
@@ -168,7 +168,7 @@ export const runDiscover = createServerFn({ method: "GET" })
 const idInput = z.object({ id: z.string().min(1) });
 
 export const getMovie = createServerFn({ method: "GET" })
-  .inputValidator((raw: unknown) => idInput.parse(raw))
+  .validator((raw: unknown) => idInput.parse(raw))
   .handler(async ({ data }): Promise<{
     item: MediaItem;
     similar: MediaItem[];
@@ -197,7 +197,7 @@ export const getMovie = createServerFn({ method: "GET" })
   });
 
 export const getShow = createServerFn({ method: "GET" })
-  .inputValidator((raw: unknown) => idInput.parse(raw))
+  .validator((raw: unknown) => idInput.parse(raw))
   .handler(async ({ data }): Promise<{
     item: MediaItem;
     similar: MediaItem[];
@@ -216,7 +216,7 @@ export const getShow = createServerFn({ method: "GET" })
 const seasonInput = z.object({ showId: z.string(), seasonNumber: z.number().int().min(0) });
 
 export const getSeason = createServerFn({ method: "GET" })
-  .inputValidator((raw: unknown) => seasonInput.parse(raw))
+  .validator((raw: unknown) => seasonInput.parse(raw))
   .handler(async ({ data }): Promise<Season> => {
     const { seasonDetail } = await import("./tmdb/repositories.server");
     const { mapSeasonDetail } = await import("./tmdb/mappers");
@@ -231,7 +231,7 @@ const episodeInput = z.object({
 });
 
 export const getEpisode = createServerFn({ method: "GET" })
-  .inputValidator((raw: unknown) => episodeInput.parse(raw))
+  .validator((raw: unknown) => episodeInput.parse(raw))
   .handler(async ({ data }): Promise<Episode> => {
     const { episodeDetail } = await import("./tmdb/repositories.server");
     const { mapEpisode } = await import("./tmdb/mappers");
@@ -244,7 +244,7 @@ export const getEpisode = createServerFn({ method: "GET" })
 const searchInput = z.object({ q: z.string().default(""), page: z.number().int().min(1).max(500).default(1) });
 
 export const runSearch = createServerFn({ method: "GET" })
-  .inputValidator((raw: unknown) => searchInput.parse(raw))
+  .validator((raw: unknown) => searchInput.parse(raw))
   .handler(async ({ data }): Promise<{ items: MediaItem[]; page: number; totalPages: number }> => {
     const q = data.q.trim();
     if (!q) return { items: [], page: 1, totalPages: 0 };
@@ -265,7 +265,7 @@ const batchInput = z.object({
 });
 
 export const getMediaByRefs = createServerFn({ method: "POST" })
-  .inputValidator((raw: unknown) => batchInput.parse(raw))
+  .validator((raw: unknown) => batchInput.parse(raw))
   .handler(async ({ data }): Promise<MediaItem[]> => {
     if (!data.refs.length) return [];
     const { movieDetail, tvDetail } = await import("./tmdb/repositories.server");
