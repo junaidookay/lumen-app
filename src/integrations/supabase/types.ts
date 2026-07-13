@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       continue_watching: {
         Row: {
+          completed: boolean
           duration_seconds: number
           episode: number | null
           id: string
@@ -23,10 +24,12 @@ export type Database = {
           media_kind: string
           progress_seconds: number
           season: number | null
+          source_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          completed?: boolean
           duration_seconds?: number
           episode?: number | null
           id?: string
@@ -34,10 +37,12 @@ export type Database = {
           media_kind: string
           progress_seconds?: number
           season?: number | null
+          source_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          completed?: boolean
           duration_seconds?: number
           episode?: number | null
           id?: string
@@ -45,6 +50,7 @@ export type Database = {
           media_kind?: string
           progress_seconds?: number
           season?: number | null
+          source_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -142,6 +148,7 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          audio_language: string
           autoplay: boolean
           autoplay_previews: boolean
           created_at: string
@@ -149,12 +156,17 @@ export type Database = {
           language: string
           mature_content: boolean
           notifications_enabled: boolean
+          playback_speed: number
+          preferred_provider: string
           quality: string
+          subtitle_language: string
+          subtitles_enabled: boolean
           theme: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          audio_language?: string
           autoplay?: boolean
           autoplay_previews?: boolean
           created_at?: string
@@ -162,12 +174,17 @@ export type Database = {
           language?: string
           mature_content?: boolean
           notifications_enabled?: boolean
+          playback_speed?: number
+          preferred_provider?: string
           quality?: string
+          subtitle_language?: string
+          subtitles_enabled?: boolean
           theme?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          audio_language?: string
           autoplay?: boolean
           autoplay_previews?: boolean
           created_at?: string
@@ -175,7 +192,11 @@ export type Database = {
           language?: string
           mature_content?: boolean
           notifications_enabled?: boolean
+          playback_speed?: number
+          preferred_provider?: string
           quality?: string
+          subtitle_language?: string
+          subtitles_enabled?: boolean
           theme?: string
           updated_at?: string
           user_id?: string
