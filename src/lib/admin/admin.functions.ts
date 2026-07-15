@@ -39,7 +39,21 @@ export const getMyPermissions = createServerFn({ method: "GET" })
       supabase.from("user_roles").select("role").eq("user_id", userId),
       supabase.from("subscriptions").select("plan_id,status,cancel_at_period_end").eq("user_id", userId).maybeSingle(),
     ]);
-    const roles = (rolesRes.data ?? []).map((r: any) => r.role);
+    let roles = (rolesRes.data ?? []).map((r: any) => r.role);
+
+    // Self-bootstrap: if no admin exists yet, promote the first user who hits this
+    if (!roles.includes("admin")) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { count } = await supabaseAdmin.from("user_roles").select("id", { count: "exact", head: true }).eq("role", "admin");
+      if ((count ?? 0) === 0) {
+        await supabaseAdmin.from("user_roles").upsert(
+          { user_id: userId, role: "admin", granted_by: userId },
+          { onConflict: "user_id,role" },
+        );
+        roles = ["admin", ...roles];
+      }
+    }
+
     return {
       roles: roles.length ? roles : ["user"],
       plan: (subRes.data?.plan_id ?? "free") as any,
