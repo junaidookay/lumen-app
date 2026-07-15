@@ -23,10 +23,13 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
+import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as WatchKindIdRouteImport } from './routes/watch.$kind.$id'
 import { Route as AuthenticatedLibraryHistoryRouteImport } from './routes/_authenticated/library.history'
 import { Route as AuthenticatedLibraryFavoritesRouteImport } from './routes/_authenticated/library.favorites'
 import { Route as AuthenticatedLibraryContinueRouteImport } from './routes/_authenticated/library.continue'
+import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe/webhook'
 import { Route as TvIdSeasonSeasonEpisodeEpisodeRouteImport } from './routes/tv.$id.season.$season.episode.$episode'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -99,6 +102,16 @@ const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBillingRoute = AuthenticatedBillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const WatchKindIdRoute = WatchKindIdRouteImport.update({
   id: '/watch/$kind/$id',
   path: '/watch/$kind/$id',
@@ -122,6 +135,11 @@ const AuthenticatedLibraryContinueRoute =
     path: '/continue',
     getParentRoute: () => AuthenticatedLibraryRoute,
   } as any)
+const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
+  id: '/api/public/stripe/webhook',
+  path: '/api/public/stripe/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TvIdSeasonSeasonEpisodeEpisodeRoute =
   TvIdSeasonSeasonEpisodeEpisodeRouteImport.update({
     id: '/season/$season/episode/$episode',
@@ -137,6 +155,8 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/admin': typeof AuthenticatedAdminRoute
+  '/billing': typeof AuthenticatedBillingRoute
   '/library': typeof AuthenticatedLibraryRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/profile': typeof AuthenticatedProfileRoute
@@ -147,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/library/favorites': typeof AuthenticatedLibraryFavoritesRoute
   '/library/history': typeof AuthenticatedLibraryHistoryRoute
   '/watch/$kind/$id': typeof WatchKindIdRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
   '/tv/$id/season/$season/episode/$episode': typeof TvIdSeasonSeasonEpisodeEpisodeRoute
 }
 export interface FileRoutesByTo {
@@ -157,6 +178,8 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/admin': typeof AuthenticatedAdminRoute
+  '/billing': typeof AuthenticatedBillingRoute
   '/library': typeof AuthenticatedLibraryRouteWithChildren
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/profile': typeof AuthenticatedProfileRoute
@@ -167,6 +190,7 @@ export interface FileRoutesByTo {
   '/library/favorites': typeof AuthenticatedLibraryFavoritesRoute
   '/library/history': typeof AuthenticatedLibraryHistoryRoute
   '/watch/$kind/$id': typeof WatchKindIdRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
   '/tv/$id/season/$season/episode/$episode': typeof TvIdSeasonSeasonEpisodeEpisodeRoute
 }
 export interface FileRoutesById {
@@ -179,6 +203,8 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/billing': typeof AuthenticatedBillingRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRouteWithChildren
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
@@ -189,6 +215,7 @@ export interface FileRoutesById {
   '/_authenticated/library/favorites': typeof AuthenticatedLibraryFavoritesRoute
   '/_authenticated/library/history': typeof AuthenticatedLibraryHistoryRoute
   '/watch/$kind/$id': typeof WatchKindIdRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
   '/tv/$id/season/$season/episode/$episode': typeof TvIdSeasonSeasonEpisodeEpisodeRoute
 }
 export interface FileRouteTypes {
@@ -201,6 +228,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/search'
     | '/sitemap.xml'
+    | '/admin'
+    | '/billing'
     | '/library'
     | '/notifications'
     | '/profile'
@@ -211,6 +240,7 @@ export interface FileRouteTypes {
     | '/library/favorites'
     | '/library/history'
     | '/watch/$kind/$id'
+    | '/api/public/stripe/webhook'
     | '/tv/$id/season/$season/episode/$episode'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -221,6 +251,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/search'
     | '/sitemap.xml'
+    | '/admin'
+    | '/billing'
     | '/library'
     | '/notifications'
     | '/profile'
@@ -231,6 +263,7 @@ export interface FileRouteTypes {
     | '/library/favorites'
     | '/library/history'
     | '/watch/$kind/$id'
+    | '/api/public/stripe/webhook'
     | '/tv/$id/season/$season/episode/$episode'
   id:
     | '__root__'
@@ -242,6 +275,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/search'
     | '/sitemap.xml'
+    | '/_authenticated/admin'
+    | '/_authenticated/billing'
     | '/_authenticated/library'
     | '/_authenticated/notifications'
     | '/_authenticated/profile'
@@ -252,6 +287,7 @@ export interface FileRouteTypes {
     | '/_authenticated/library/favorites'
     | '/_authenticated/library/history'
     | '/watch/$kind/$id'
+    | '/api/public/stripe/webhook'
     | '/tv/$id/season/$season/episode/$episode'
   fileRoutesById: FileRoutesById
 }
@@ -267,6 +303,7 @@ export interface RootRouteChildren {
   MovieIdRoute: typeof MovieIdRoute
   TvIdRoute: typeof TvIdRouteWithChildren
   WatchKindIdRoute: typeof WatchKindIdRoute
+  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -369,6 +406,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLibraryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/billing': {
+      id: '/_authenticated/billing'
+      path: '/billing'
+      fullPath: '/billing'
+      preLoaderRoute: typeof AuthenticatedBillingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/watch/$kind/$id': {
       id: '/watch/$kind/$id'
       path: '/watch/$kind/$id'
@@ -397,6 +448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLibraryContinueRouteImport
       parentRoute: typeof AuthenticatedLibraryRoute
     }
+    '/api/public/stripe/webhook': {
+      id: '/api/public/stripe/webhook'
+      path: '/api/public/stripe/webhook'
+      fullPath: '/api/public/stripe/webhook'
+      preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tv/$id/season/$season/episode/$episode': {
       id: '/tv/$id/season/$season/episode/$episode'
       path: '/season/$season/episode/$episode'
@@ -423,6 +481,8 @@ const AuthenticatedLibraryRouteWithChildren =
   AuthenticatedLibraryRoute._addFileChildren(AuthenticatedLibraryRouteChildren)
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRouteWithChildren
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
@@ -430,6 +490,8 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedBillingRoute: AuthenticatedBillingRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRouteWithChildren,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
@@ -461,6 +523,7 @@ const rootRouteChildren: RootRouteChildren = {
   MovieIdRoute: MovieIdRoute,
   TvIdRoute: TvIdRouteWithChildren,
   WatchKindIdRoute: WatchKindIdRoute,
+  ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

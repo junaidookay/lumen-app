@@ -1,11 +1,13 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, User, Settings, Bell, Bookmark, Heart, History, PlayCircle } from "lucide-react";
+import { LogOut, User, Settings, Bell, Bookmark, Heart, History, PlayCircle, CreditCard, Shield } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { getProfile, listNotifications } from "@/services/library";
+import { usePermissions } from "@/hooks/use-permissions";
+import { isModerator } from "@/lib/permissions";
 
 export function AccountMenu() {
   const { user, loading } = useAuth();
@@ -13,6 +15,7 @@ export function AccountMenu() {
   const qc = useQueryClient();
   const { data: profile } = useQuery({ queryKey: ["profile", user?.id], queryFn: () => getProfile(user!.id), enabled: !!user });
   const { data: notifs } = useQuery({ queryKey: ["notifications"], queryFn: listNotifications, enabled: !!user });
+  const { data: perms } = usePermissions();
   const unread = (notifs ?? []).filter((n) => !n.read).length;
   if (loading) return <div className="h-10 w-10 rounded-full glass" />;
   if (!user) {
@@ -39,7 +42,11 @@ export function AccountMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => nav({ to: "/notifications" })}><Bell className="mr-2 h-4 w-4" /> Notifications {unread > 0 && <span className="ml-auto rounded-full bg-brand px-1.5 text-[10px] text-brand-foreground">{unread}</span>}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => nav({ to: "/profile" })}><User className="mr-2 h-4 w-4" /> Profile</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => nav({ to: "/billing" })}><CreditCard className="mr-2 h-4 w-4" /> Billing</DropdownMenuItem>
         <DropdownMenuItem onClick={() => nav({ to: "/settings" })}><Settings className="mr-2 h-4 w-4" /> Settings</DropdownMenuItem>
+        {isModerator(perms) && (
+          <DropdownMenuItem onClick={() => nav({ to: "/admin" })}><Shield className="mr-2 h-4 w-4" /> Admin</DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut} className="text-red-400 focus:text-red-400"><LogOut className="mr-2 h-4 w-4" /> Sign out</DropdownMenuItem>
       </DropdownMenuContent>
