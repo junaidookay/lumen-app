@@ -65,8 +65,11 @@ export function SmartInstallBanner() {
       setReminderState({ ...getReminderState(), installed: true });
       return;
     }
-    if (!canInstall || isPlaying) return;
+    if (isPlaying) return;
     if (wasDismissed() || !shouldShowReminder()) return;
+    // On iOS there's no beforeinstallprompt, so canInstall is always false.
+    // Still show the banner with manual instructions for iOS users.
+    if (!canInstall && platform !== "ios") return;
 
     const timer = setTimeout(() => {
       setVisible(true);
@@ -74,7 +77,7 @@ export function SmartInstallBanner() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [canInstall, isInstalled, isPlaying, wasDismissed]);
+  }, [canInstall, isInstalled, isPlaying, wasDismissed, platform]);
 
   const dismiss = useCallback((method: string) => {
     setVisible(false);

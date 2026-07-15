@@ -14,10 +14,27 @@ import type { Permissions } from "@/lib/permissions";
 // ------------------------------------------------------------------
 
 async function ensureAdmin(supabase: any, userId: string, role: "moderator" | "admin" = "moderator") {
+  // Check user_roles via the user's own client (RLS allows reading own roles)
   const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
   if (error) throw new Error("Failed to resolve permissions");
   const roles = (data ?? []).map((r: any) => r.role as string);
-  const ok = role === "admin" ? roles.includes("admin") : roles.includes("admin") || roles.includes("moderator");
+
+  let ok = role === "admin" ? roles.includes("admin") : roles.includes("admin") || roles.includes("moderator");
+
+  // Also check profiles.is_admin via service role as fallback
+  if (!ok) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: profile } = await supabaseAdmin.from("profiles").select("is_admin").eq("id", userId).maybeSingle();
+    if (profile?.is_admin) {
+      ok = true;
+      // Sync to user_roles so future checks work
+      await supabaseAdmin.from("user_roles").upsert(
+        { user_id: userId, role: "admin", granted_by: userId },
+        { onConflict: "user_id,role" },
+      );
+    }
+  }
+
   if (!ok) throw new Error("Forbidden");
   return roles;
 }
