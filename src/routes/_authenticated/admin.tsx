@@ -15,7 +15,7 @@ import { UpgradeCTA } from "@/components/feature-gate/FeatureGate";
 import { cn } from "@/lib/utils";
 import {
   getPlatformOverview, getGrowthSeries,
-  listUsers, setUserStatus, setUserRole, resetUserData,
+  listUsers, setUserStatus, setUserRole, toggleUserAdmin, resetUserData,
   listReports, resolveReport,
   listBroadcasts, sendBroadcast,
   getHomepageConfig, updateHomepageConfig,
@@ -152,6 +152,7 @@ function Users() {
   const statusMut = useMutation({ mutationFn: (v: { userId: string; status: "active" | "suspended" | "banned" }) => setUserStatus({ data: v }), onSuccess: () => { toast.success("Updated"); invalidate(); }, onError: (e: any) => toast.error(e?.message) });
   const roleMut = useMutation({ mutationFn: (v: { userId: string; role: "user" | "moderator" | "admin"; grant: boolean }) => setUserRole({ data: v }), onSuccess: () => { toast.success("Roles updated"); invalidate(); qc.invalidateQueries({ queryKey: ["permissions"] }); }, onError: (e: any) => toast.error(e?.message) });
   const resetMut = useMutation({ mutationFn: (userId: string) => resetUserData({ data: { userId } }), onSuccess: () => { toast.success("User data reset"); invalidate(); }, onError: (e: any) => toast.error(e?.message) });
+  const adminMut = useMutation({ mutationFn: (v: { userId: string; isAdmin: boolean }) => toggleUserAdmin({ data: v }), onSuccess: () => { toast.success("Admin status updated"); invalidate(); qc.invalidateQueries({ queryKey: ["permissions"] }); }, onError: (e: any) => toast.error(e?.message) });
 
   function confirmAction(msg: string, fn: () => void) { if (window.confirm(msg)) fn(); }
 
@@ -168,6 +169,7 @@ function Users() {
               <th className="px-4 py-3 text-left">Email</th>
               <th className="px-4 py-3 text-left">Plan</th>
               <th className="px-4 py-3 text-left">Roles</th>
+              <th className="px-4 py-3 text-left">Admin</th>
               <th className="px-4 py-3 text-left">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -182,6 +184,12 @@ function Users() {
                 <td className="px-4 py-3 text-muted-foreground">{u.email ?? "—"}</td>
                 <td className="px-4 py-3 capitalize">{u.plan}{u.sub_status ? ` · ${u.sub_status}` : ""}</td>
                 <td className="px-4 py-3">{(u.roles as string[]).join(", ") || "user"}</td>
+                <td className="px-4 py-3">
+                  <Switch
+                    checked={u.is_admin}
+                    onCheckedChange={(v) => confirmAction(`Set admin to ${v ? "Yes" : "No"}?`, () => adminMut.mutate({ userId: u.id, isAdmin: v }))}
+                  />
+                </td>
                 <td className="px-4 py-3">
                   <span className={cn("rounded-full px-2 py-0.5 text-xs",
                     u.status === "banned" ? "bg-red-500/10 text-red-300" :
@@ -204,7 +212,7 @@ function Users() {
                 </td>
               </tr>
             ))}
-            {(data?.rows ?? []).length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No users found.</td></tr>}
+            {(data?.rows ?? []).length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">No users found.</td></tr>}
           </tbody>
         </table>
       </div>

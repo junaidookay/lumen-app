@@ -35,21 +35,30 @@ export const getMyPermissions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<Permissions> => {
     const { supabase, userId } = context;
-    const [rolesRes, subRes] = await Promise.all([
+    const [rolesRes, subRes, profileRes] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId),
       supabase.from("subscriptions").select("plan_id,status,cancel_at_period_end").eq("user_id", userId).maybeSingle(),
+      supabase.from("profiles").select("is_admin").eq("id", userId).maybeSingle(),
     ]);
     let roles = (rolesRes.data ?? []).map((r: any) => r.role);
+
+    // Also treat profiles.is_admin as admin
+    if (profileRes.data?.is_admin && !roles.includes("admin")) {
+      roles = ["admin", ...roles];
+    }
 
     // Self-bootstrap: if no admin exists yet, promote the first user who hits this
     if (!roles.includes("admin")) {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { count } = await supabaseAdmin.from("user_roles").select("id", { count: "exact", head: true }).eq("role", "admin");
       if ((count ?? 0) === 0) {
-        await supabaseAdmin.from("user_roles").upsert(
-          { user_id: userId, role: "admin", granted_by: userId },
-          { onConflict: "user_id,role" },
-        );
+        await Promise.all([
+          supabaseAdmin.from("user_roles").upsert(
+            { user_id: userId, role: "admin", granted_by: userId },
+            { onConflict: "user_id,role" },
+          ),
+          supabaseAdmin.from("profiles").update({ is_admin: true }).eq("id", userId),
+        ]);
         roles = ["admin", ...roles];
       }
     }
@@ -136,7 +145,7 @@ export const listUsers = createServerFn({ method: "POST" })
 
     let q = supabaseAdmin
       .from("profiles")
-      .select("id, display_name, username, avatar_url, status, created_at", { count: "exact" })
+      .select("id, display_name, username, avatar_url, status, is_admin, created_at", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(from, to);
     if (data.q) q = q.or(`display_name.ilike.%${data.q}%,username.ilike.%${data.q}%`);
@@ -163,6 +172,7 @@ export const listUsers = createServerFn({ method: "POST" })
       username: p.username,
       avatar_url: p.avatar_url,
       status: p.status,
+      is_admin: p.is_admin,
       created_at: p.created_at,
       email: emailMap.get(p.id) ?? null,
       roles: (roles ?? []).filter((r: any) => r.user_id === p.id).map((r: any) => r.role),
@@ -201,6 +211,24 @@ export const setUserRole = createServerFn({ method: "POST" })
       await supabaseAdmin.from("user_roles").delete().eq("user_id", data.userId).eq("role", data.role);
     }
     await writeAudit(context.userId, data.grant ? "role.grant" : "role.revoke", "user", data.userId, { role: data.role });
+    return { ok: true };
+  });
+
+export const toggleUserAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { userId: string; isAdmin: boolean }) =>
+    z.object({ userId: z.string().uuid(), isAdmin: z.boolean() }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context.supabase, context.userId, "admin");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("profiles").update({ is_admin: data.isAdmin }).eq("id", data.userId);
+    if (data.isAdmin) {
+      await supabaseAdmin.from("user_roles").upsert({ user_id: data.userId, role: "admin", granted_by: context.userId }, { onConflict: "user_id,role" });
+    } else {
+      await supabaseAdmin.from("user_roles").delete().eq("user_id", data.userId).eq("role", "admin");
+    }
+    await writeAudit(context.userId, data.isAdmin ? "admin.grant" : "admin.revoke", "user", data.userId);
     return { ok: true };
   });
 
