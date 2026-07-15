@@ -145,10 +145,10 @@ export const listUsers = createServerFn({ method: "POST" })
 
     let q = supabaseAdmin
       .from("profiles")
-      .select("id, display_name, username, avatar_url, status, is_admin, created_at", { count: "exact" })
+      .select("id, display_name, username, avatar_url, status, is_admin, email, created_at", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(from, to);
-    if (data.q) q = q.or(`display_name.ilike.%${data.q}%,username.ilike.%${data.q}%`);
+    if (data.q) q = q.or(`display_name.ilike.%${data.q}%,username.ilike.%${data.q}%,email.ilike.%${data.q}%`);
     const { data: profiles, count } = await q;
 
     const ids = (profiles ?? []).map((p: any) => p.id);
@@ -159,13 +159,6 @@ export const listUsers = createServerFn({ method: "POST" })
       supabaseAdmin.from("subscriptions").select("user_id, plan_id, status").in("user_id", ids),
     ]);
 
-    // Emails from auth.users via Admin API
-    const emailMap = new Map<string, string>();
-    for (const id of ids) {
-      const { data: u } = await supabaseAdmin.auth.admin.getUserById(id);
-      if (u?.user?.email) emailMap.set(id, u.user.email);
-    }
-
     const rows = (profiles ?? []).map((p: any) => ({
       id: p.id,
       display_name: p.display_name,
@@ -174,7 +167,7 @@ export const listUsers = createServerFn({ method: "POST" })
       status: p.status,
       is_admin: p.is_admin,
       created_at: p.created_at,
-      email: emailMap.get(p.id) ?? null,
+      email: p.email ?? null,
       roles: (roles ?? []).filter((r: any) => r.user_id === p.id).map((r: any) => r.role),
       plan: (subs ?? []).find((s: any) => s.user_id === p.id)?.plan_id ?? "free",
       sub_status: (subs ?? []).find((s: any) => s.user_id === p.id)?.status ?? null,

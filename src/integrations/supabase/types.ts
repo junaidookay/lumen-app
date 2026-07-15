@@ -285,6 +285,7 @@ export type Database = {
           bio: string | null
           created_at: string
           display_name: string | null
+          email: string | null
           id: string
           is_admin: boolean
           status: string
@@ -297,6 +298,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           display_name?: string | null
+          email?: string | null
           id: string
           is_admin?: boolean
           status?: string
@@ -309,6 +311,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           display_name?: string | null
+          email?: string | null
           id?: string
           is_admin?: boolean
           status?: string
