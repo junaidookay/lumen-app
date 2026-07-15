@@ -1,5 +1,26 @@
 import type { DeviceCapabilities } from "@/pwa/types";
 
+export const EMPTY_CAPABILITIES: DeviceCapabilities = {
+  install: false,
+  share: false,
+  clipboard: false,
+  wakeLock: false,
+  pictureInPicture: false,
+  orientation: false,
+  fullscreen: false,
+  notifications: false,
+  push: false,
+  bluetooth: false,
+  airplay: false,
+  chromecast: false,
+  backgroundPlayback: false,
+  mediaSession: false,
+  webWorkers: false,
+  CacheStorage: false,
+  IndexedDB: false,
+  navigationPreload: false,
+};
+
 let cached: DeviceCapabilities | null = null;
 
 export function getCapabilities(): DeviceCapabilities {
@@ -10,26 +31,7 @@ export function getCapabilities(): DeviceCapabilities {
 
 function detectCapabilities(): DeviceCapabilities {
   if (typeof window === "undefined") {
-    return {
-      install: false,
-      share: false,
-      clipboard: false,
-      wakeLock: false,
-      pictureInPicture: false,
-      orientation: false,
-      fullscreen: false,
-      notifications: false,
-      push: false,
-      bluetooth: false,
-      airplay: false,
-      chromecast: false,
-      backgroundPlayback: false,
-      mediaSession: false,
-      webWorkers: false,
-      CacheStorage: false,
-      IndexedDB: false,
-      navigationPreload: false,
-    };
+    return EMPTY_CAPABILITIES;
   }
 
   return {
