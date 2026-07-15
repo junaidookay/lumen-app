@@ -2,6 +2,18 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, Copy, Facebook, Link2, Twitter, X } from "lucide-react";
 
+function openShare(url: string, label: string) {
+  const text = encodeURIComponent("Check this out on Lumen");
+  const encodedUrl = encodeURIComponent(url);
+  const shareUrls: Record<string, string> = {
+    X: `https://twitter.com/intent/tweet?text=${text}&url=${encodedUrl}`,
+    Facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+    Link: url,
+  };
+  const target = shareUrls[label];
+  if (target) window.open(target, "_blank", "noopener,noreferrer,width=600,height=400");
+}
+
 export function ShareDialog({ open, onClose, url, title }: { open: boolean; onClose: () => void; url: string; title: string }) {
   const [copied, setCopied] = useState(false);
   const doCopy = async () => {
@@ -11,6 +23,13 @@ export function ShareDialog({ open, onClose, url, title }: { open: boolean; onCl
       setTimeout(() => setCopied(false), 1500);
     } catch { /* noop */ }
   };
+
+  const socials = [
+    { icon: Twitter, label: "X" },
+    { icon: Facebook, label: "Facebook" },
+    { icon: Link2, label: "Link" },
+  ];
+
   return (
     <AnimatePresence>
       {open && (
@@ -30,8 +49,12 @@ export function ShareDialog({ open, onClose, url, title }: { open: boolean; onCl
               <button aria-label="Close" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full hover:bg-white/10"><X className="h-4 w-4" /></button>
             </div>
             <div className="mt-5 grid grid-cols-3 gap-3">
-              {[{ icon: Twitter, label: "X" }, { icon: Facebook, label: "Facebook" }, { icon: Link2, label: "Link" }].map((s) => (
-                <button key={s.label} className="flex flex-col items-center gap-2 rounded-2xl border border-white/5 bg-surface-elevated py-4 text-sm hover:bg-white/10">
+              {socials.map((s) => (
+                <button
+                  key={s.label}
+                  onClick={() => openShare(url, s.label)}
+                  className="flex flex-col items-center gap-2 rounded-2xl border border-white/5 bg-surface-elevated py-4 text-sm hover:bg-white/10"
+                >
                   <s.icon className="h-5 w-5" />
                   {s.label}
                 </button>

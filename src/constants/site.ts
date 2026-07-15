@@ -16,4 +16,5 @@ export const NAV_LINKS: readonly NavLink[] = [
   { to: "/home", label: "Browse" },
   { to: "/discover", label: "Discover" },
   { to: "/search", label: "Search" },
+  { to: "/install", label: "Install" },
 ] as const;

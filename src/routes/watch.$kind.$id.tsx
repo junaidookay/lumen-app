@@ -105,7 +105,20 @@ function WatchPage() {
   const lastSaveRef = useRef(0);
   const lastHistoryRef = useRef(0);
 
-  if (!detail) {
+  // Derived values from detail (must be before any early return)
+  const item = detail?.item;
+  const seasons = item?.seasons ?? [];
+  const [activeSeason, setActiveSeason] = useState(search.season);
+  const seasonBase = seasons.find((s) => s.seasonNumber === activeSeason) ?? seasons[0];
+  const seasonFull = useQuery({
+    ...seasonQuery(item?.id ?? "", seasonBase?.seasonNumber ?? 1),
+    enabled: isTV && !!seasonBase && !!item,
+  });
+  const season = seasonFull.data ?? seasonBase;
+  const currentEp = season?.episodes.find((e) => e.episodeNumber === search.episode) ?? season?.episodes[0];
+  const upNext = season?.episodes.find((e) => e.episodeNumber === (currentEp?.episodeNumber ?? 0) + 1);
+
+  if (!detail || !item) {
     return (
       <AppShell>
         <div className="mx-auto max-w-[1200px] px-4 pb-16 pt-32 sm:px-6 lg:px-10">
@@ -114,19 +127,9 @@ function WatchPage() {
       </AppShell>
     );
   }
-  const item = detail.item;
+
   const similar = detail.similar.slice(0, 8);
   const recs = detail.recommendations.slice(0, 8);
-  const seasons = item.seasons ?? [];
-  const [activeSeason, setActiveSeason] = useState(search.season);
-  const seasonBase = seasons.find((s) => s.seasonNumber === activeSeason) ?? seasons[0];
-  const seasonFull = useQuery({
-    ...seasonQuery(item.id, seasonBase?.seasonNumber ?? 1),
-    enabled: isTV && !!seasonBase,
-  });
-  const season = seasonFull.data ?? seasonBase;
-  const currentEp = season?.episodes.find((e) => e.episodeNumber === search.episode) ?? season?.episodes[0];
-  const upNext = season?.episodes.find((e) => e.episodeNumber === (currentEp?.episodeNumber ?? 0) + 1);
 
   const goEpisode = (n: number) =>
     navigate({ to: "/watch/$kind/$id", params: { kind: item.kind, id: item.id }, search: { season: activeSeason, episode: n } });

@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
 import type { MediaItem } from "@/types/media";
 import { TrailerModal } from "@/components/dialogs/TrailerModal";
 import { ShareDialog } from "@/components/dialogs/ShareDialog";
+import { WatchlistButton } from "@/components/library/LibraryButtons";
+import { FavoriteButton } from "@/components/library/LibraryButtons";
 
 export function MovieHero({ item }: { item: MediaItem }) {
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [inList, setInList] = useState(false);
-  const [fav, setFav] = useState(false);
 
   return (
     <section className="relative isolate min-h-[90vh] w-full overflow-hidden">
@@ -65,8 +65,8 @@ export function MovieHero({ item }: { item: MediaItem }) {
                   Watch trailer
                 </Button>
               ) : null}
-              <IconAction label="Watchlist" active={inList} onClick={() => setInList((v) => !v)}><Bookmark className={inList ? "fill-current" : ""} /></IconAction>
-              <IconAction label="Favorite" active={fav} onClick={() => setFav((v) => !v)}><Heart className={fav ? "fill-current" : ""} /></IconAction>
+              <WatchlistButton mediaId={item.id} mediaKind={item.kind} />
+              <FavoriteButton mediaId={item.id} mediaKind={item.kind} />
               <IconAction label="Share" onClick={() => setShareOpen(true)}><Share2 /></IconAction>
             </div>
           </motion.div>
