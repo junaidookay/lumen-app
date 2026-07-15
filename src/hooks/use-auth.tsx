@@ -3,6 +3,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { cleanupOnLogout } from "@/pwa/services/auth-cleanup";
 
 type AuthCtx = {
   session: Session | null;
@@ -24,6 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         router.invalidate();
         if (event !== "SIGNED_OUT") qc.invalidateQueries();
+      }
+      if (event === "SIGNED_OUT" && s?.user?.id) {
+        cleanupOnLogout(s.user.id).catch(() => {});
       }
     });
     supabase.auth.getSession().then(({ data }) => {

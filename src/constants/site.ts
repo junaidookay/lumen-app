@@ -6,7 +6,7 @@ export const SITE = {
 } as const;
 
 export interface NavLink {
-  to: "/" | "/home" | "/discover" | "/search";
+  to: "/" | "/home" | "/discover" | "/search" | "/install";
   label: string;
   exact?: boolean;
 }

@@ -1,0 +1,29 @@
+[
+  {
+    "path": "/",
+    "thresholds": {
+      "performance": 90,
+      "accessibility": 95,
+      "best-practices": 90,
+      "seo": 90
+    }
+  },
+  {
+    "path": "/home",
+    "thresholds": {
+      "performance": 85,
+      "accessibility": 95,
+      "best-practices": 90,
+      "seo": 90
+    }
+  },
+  {
+    "path": "/discover",
+    "thresholds": {
+      "performance": 85,
+      "accessibility": 95,
+      "best-practices": 90,
+      "seo": 90
+    }
+  }
+]

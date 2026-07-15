@@ -25,6 +25,7 @@ export function Navbar() {
       <header
         className={cn(
           "fixed inset-x-0 top-0 z-50 transition-all duration-300",
+          "pt-[env(safe-area-inset-top)]",
           scrolled ? "glass border-b border-white/5" : "bg-transparent",
         )}
       >
@@ -47,6 +48,8 @@ export function Navbar() {
                 <Link
                   key={l.to}
                   to={l.to}
+                  aria-current={active ? "page" : undefined}
+                  data-touch-target
                   className={cn(
                     "relative rounded-full px-4 py-2 text-sm transition-colors",
                     active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
@@ -69,6 +72,7 @@ export function Navbar() {
             <Link
               to="/search"
               aria-label="Search"
+              data-touch-target
               className="grid h-10 w-10 place-items-center rounded-full glass transition hover:bg-white/10"
             >
               <Search className="h-4 w-4" />
@@ -78,6 +82,7 @@ export function Navbar() {
               type="button"
               aria-label="Open menu"
               onClick={() => setOpen(true)}
+              data-touch-target
               className="grid h-10 w-10 place-items-center rounded-full glass transition hover:bg-white/10 md:hidden"
             >
               <Menu className="h-4 w-4" />

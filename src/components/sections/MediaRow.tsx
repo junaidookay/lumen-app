@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useCallback, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
 import type { MediaItem, MediaRow as MediaRowType } from "@/types/media";
@@ -14,12 +14,34 @@ interface MediaRowProps {
 
 export function MediaRow({ row, variant = "poster", className, onSelect }: MediaRowProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchDelta, setTouchDelta] = useState(0);
 
-  const scrollBy = (dir: 1 | -1) => {
+  const scrollBy = useCallback((dir: 1 | -1) => {
     const el = scrollerRef.current;
     if (!el) return;
     el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: "smooth" });
-  };
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    setTouchStart(e.touches[0].clientX);
+    setTouchDelta(0);
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    const delta = touchStart - e.touches[0].clientX;
+    setTouchDelta(delta);
+  }, [touchStart]);
+
+  const handleTouchEnd = useCallback(() => {
+    const threshold = 50;
+    if (Math.abs(touchDelta) > threshold) {
+      scrollBy(touchDelta > 0 ? 1 : -1);
+    }
+    setTouchStart(null);
+    setTouchDelta(0);
+  }, [touchDelta, scrollBy]);
 
   return (
     <section className={cn("group/rail relative", className)} aria-label={row.title}>
@@ -43,6 +65,7 @@ export function MediaRow({ row, variant = "poster", className, onSelect }: Media
             type="button"
             aria-label="Scroll left"
             onClick={() => scrollBy(-1)}
+            data-touch-target
             className="grid h-9 w-9 place-items-center rounded-full glass transition hover:bg-white/10"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -51,6 +74,7 @@ export function MediaRow({ row, variant = "poster", className, onSelect }: Media
             type="button"
             aria-label="Scroll right"
             onClick={() => scrollBy(1)}
+            data-touch-target
             className="grid h-9 w-9 place-items-center rounded-full glass transition hover:bg-white/10"
           >
             <ChevronRight className="h-4 w-4" />
@@ -59,6 +83,9 @@ export function MediaRow({ row, variant = "poster", className, onSelect }: Media
       </div>
       <div
         ref={scrollerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pb-4 sm:px-6 lg:px-10"
       >
         {row.items.map((item, i) => (

@@ -142,15 +142,25 @@
     -webkit-font-smoothing: antialiased;
     background-image: var(--gradient-radial);
     background-attachment: fixed;
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   html {
     scroll-behavior: smooth;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   ::selection {
     background: oklch(0.72 0.19 25 / 0.35);
     color: oklch(0.99 0 0);
+  }
+
+  /* Touch target minimum */
+  [data-touch-target] {
+    min-height: 44px;
+    min-width: 44px;
   }
 
   /* Hide scrollbars on horizontal rails */

@@ -37,3 +37,9 @@ dist-ssr
 *.sw?
 supabase/.temp
 .vercel
+
+# Testing
+coverage
+playwright-report
+test-results
+dist/stats.html

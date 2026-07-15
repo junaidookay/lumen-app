@@ -25,6 +25,10 @@ import {
 import { cn } from "@/lib/utils";
 import { track as trackPlayback } from "@/lib/analytics/playback";
 import { pickFallback } from "@/lib/streaming/service";
+import { setGlobalPlaybackState } from "@/pwa/hooks/use-video-playback";
+import { requestWakeLock, releaseWakeLock } from "@/pwa/services/wake-lock";
+import { savePlaybackState } from "@/pwa/services/playback-state";
+import { updateMediaSession } from "@/pwa/services/casting";
 import type {
   AudioTrack,
   PlaybackPreferences,
@@ -305,6 +309,14 @@ export function VideoPlayer(props: VideoPlayerProps) {
           percent: pct,
           sourceId: source?.id ?? "",
         });
+        savePlaybackState({
+          mediaId,
+          mediaKind,
+          season,
+          episode,
+          positionSeconds: v.currentTime,
+          durationSeconds: dur,
+        });
         // Up-next window: last 30s and TV episode
         if (upNext && dur - v.currentTime <= 30 && !v.paused) setUpNextVisible(true);
         else if (dur - v.currentTime > 30) setUpNextVisible(false);
@@ -312,6 +324,13 @@ export function VideoPlayer(props: VideoPlayerProps) {
     };
     const onPlayEv = () => {
       setPlaying(true);
+      setGlobalPlaybackState(true);
+      requestWakeLock();
+      updateMediaSession({
+        title,
+        artist: subtitle,
+        artwork: poster,
+      });
       trackPlayback({
         name: "playback.started",
         mediaId, mediaKind, season, episode, sourceId: source?.id, provider: source?.provider,
@@ -320,6 +339,8 @@ export function VideoPlayer(props: VideoPlayerProps) {
     };
     const onPauseEv = () => {
       setPlaying(false);
+      setGlobalPlaybackState(false);
+      releaseWakeLock();
       trackPlayback({
         name: "playback.paused",
         mediaId, mediaKind, season, episode, sourceId: source?.id,
@@ -329,6 +350,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
     const onWaiting = () => setBuffering(true);
     const onPlaying = () => setBuffering(false);
     const onEnded = () => {
+      releaseWakeLock();
       trackPlayback({
         name: "playback.completed",
         mediaId, mediaKind, season, episode, sourceId: source?.id,
@@ -352,6 +374,8 @@ export function VideoPlayer(props: VideoPlayerProps) {
     v.addEventListener("volumechange", onVolumeChange);
     v.addEventListener("error", onError);
     return () => {
+      setGlobalPlaybackState(false);
+      releaseWakeLock();
       v.removeEventListener("loadedmetadata", onLoaded);
       v.removeEventListener("timeupdate", onTime);
       v.removeEventListener("play", onPlayEv);
@@ -362,7 +386,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
       v.removeEventListener("volumechange", onVolumeChange);
       v.removeEventListener("error", onError);
     };
-  }, [source, resumeSeconds, preferences.playbackSpeed, mediaId, mediaKind, season, episode, upNext, onProgress, onCompleted, tryFallback]);
+  }, [source, resumeSeconds, preferences.playbackSpeed, mediaId, mediaKind, season, episode, upNext, onProgress, onCompleted, tryFallback, title, subtitle, poster]);
 
   // Auto-hide controls while playing
   const showControls = useCallback(() => {
