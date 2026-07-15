@@ -1,14 +1,18 @@
 -- Add is_admin toggle to profiles for quick admin management
-ALTER TABLE public.profiles ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
 
 -- Store email in profiles for easier queries
-ALTER TABLE public.profiles ADD COLUMN email TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email TEXT;
 
 -- Allow admins to update is_admin on any profile
-CREATE POLICY "admins toggle is_admin" ON public.profiles
-  FOR UPDATE TO authenticated
-  USING (public.is_admin(auth.uid()))
-  WITH CHECK (public.is_admin(auth.uid()));
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'admins toggle is_admin') THEN
+    CREATE POLICY "admins toggle is_admin" ON public.profiles
+      FOR UPDATE TO authenticated
+      USING (public.is_admin(auth.uid()))
+      WITH CHECK (public.is_admin(auth.uid()));
+  END IF;
+END $$;
 
 -- First user (by created_at) gets auto-promoted
 UPDATE public.profiles SET is_admin = true

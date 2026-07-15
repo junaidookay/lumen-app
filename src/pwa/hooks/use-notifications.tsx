@@ -4,7 +4,7 @@ import {
   initializeNotificationProviders,
   getAvailableProviders,
 } from "@/pwa/services/notifications";
-import { getCapabilities } from "@/pwa/services/capabilities";
+import { useCapabilities } from "@/pwa/hooks/use-capabilities";
 import type { NotificationProvider, NotificationPermission, NotificationProviderConfig } from "@/pwa/types";
 
 export function useNotifications(config?: NotificationProviderConfig) {
@@ -60,7 +60,7 @@ export function useNotifications(config?: NotificationProviderConfig) {
     }
   }, []);
 
-  const capabilities = getCapabilities();
+  const capabilities = useCapabilities();
 
   return {
     provider,

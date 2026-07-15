@@ -45,6 +45,12 @@ export const getMyPermissions = createServerFn({ method: "GET" })
     // Also treat profiles.is_admin as admin
     if (profileRes.data?.is_admin && !roles.includes("admin")) {
       roles = ["admin", ...roles];
+      // Sync to user_roles so ensureAdmin() works for server functions
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("user_roles").upsert(
+        { user_id: userId, role: "admin", granted_by: userId },
+        { onConflict: "user_id,role" },
+      );
     }
 
     // Self-bootstrap: if no admin exists yet, promote the first user who hits this

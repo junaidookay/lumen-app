@@ -52,7 +52,7 @@ function detectCapabilities(): DeviceCapabilities {
     webWorkers: "Worker" in window,
     CacheStorage: "caches" in window,
     IndexedDB: "indexedDB" in window,
-    navigationPreload: "navigationPreload" in (self as any).registration || false,
+    navigationPreload: typeof self !== "undefined" && "registration" in self && "navigationPreload" in ((self as any).registration || {}),
   };
 }
 
