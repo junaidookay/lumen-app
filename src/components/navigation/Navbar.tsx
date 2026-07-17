@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "motion/react";
-import { Menu, Search, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { NAV_LINKS, SITE } from "@/constants/site";
 import { cn } from "@/lib/utils";
 import { AccountMenu } from "@/components/navigation/AccountMenu";
@@ -70,12 +70,12 @@ export function Navbar() {
 
           <div className="ml-auto flex items-center gap-2">
             <Link
-              to="/search"
-              aria-label="Search"
+              to="/billing"
+              aria-label="Subscribe"
               data-touch-target
-              className="grid h-10 w-10 place-items-center rounded-full glass transition hover:bg-white/10"
+              className="hidden rounded-full bg-brand px-4 py-2 text-xs font-medium text-brand-foreground shadow-[var(--shadow-glow)] hover:bg-brand/90 md:inline-flex"
             >
-              <Search className="h-4 w-4" />
+              Subscribe
             </Link>
             <AccountMenu />
             <button

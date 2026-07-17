@@ -15,6 +15,10 @@ const envSchema = z.object({
   // Stripe (optional — not required for dev)
   STRIPE_SECRET_KEY: z.string().startsWith("sk_").optional(),
   STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional(),
+
+  // PawaPay (optional — mobile money for African markets)
+  PAWAPAY_API_KEY: z.string().min(1).optional(),
+  PAWAPAY_ENVIRONMENT: z.enum(["sandbox", "production"]).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

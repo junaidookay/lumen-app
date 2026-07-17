@@ -22,6 +22,11 @@ import {
   listAdPlacements, updateAdPlacement,
   listAuditLogs,
 } from "@/lib/admin/admin.functions";
+import {
+  generateRedemptionCodes,
+  listRedemptionCodes,
+  toggleRedemptionCode,
+} from "@/lib/billing/redemption.functions";
 import { AD_SLOT_LABELS, AD_PROVIDERS } from "@/lib/ads/registry";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -30,7 +35,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
 });
 
-type TabId = "overview" | "users" | "content" | "moderation" | "notifications" | "analytics" | "ads" | "audit";
+type TabId = "overview" | "users" | "content" | "moderation" | "notifications" | "analytics" | "ads" | "codes" | "audit";
 
 const TABS: { id: TabId; label: string; requiresAdmin?: boolean }[] = [
   { id: "overview", label: "Overview" },
@@ -40,6 +45,7 @@ const TABS: { id: TabId; label: string; requiresAdmin?: boolean }[] = [
   { id: "notifications", label: "Notifications" },
   { id: "analytics", label: "Analytics" },
   { id: "ads", label: "Ads" },
+  { id: "codes", label: "Codes", requiresAdmin: true },
   { id: "audit", label: "Audit", requiresAdmin: true },
 ];
 
@@ -91,6 +97,7 @@ function AdminPage() {
         {tab === "notifications" && <Notifications />}
         {tab === "analytics" && <Analytics />}
         {tab === "ads" && <Ads />}
+        {tab === "codes" && isAdmin(perms) && <Codes />}
         {tab === "audit" && isAdmin(perms) && <Audit />}
       </div>
     </AppShell>
@@ -377,7 +384,7 @@ function Ads() {
   });
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Providers are abstracted — no network is wired in yet. Premium users always skip ads.</p>
+      <p className="text-sm text-muted-foreground">Adsterra is the primary ad network. Premium users always skip ads.</p>
       {(data ?? []).map((p: any) => (
         <div key={p.slot} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/5 glass p-4">
           <div>
@@ -393,6 +400,143 @@ function Ads() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ---------- Codes ----------
+function Codes() {
+  const qc = useQueryClient();
+  const { data: codes, isLoading } = useQuery({ queryKey: ["admin", "codes"], queryFn: () => listRedemptionCodes() });
+  const [form, setForm] = useState({ count: 5, durationDays: 30, maxDownloadsPerDay: 3, maxRedemptions: "", expiresAt: "" });
+  const [generated, setGenerated] = useState<string[]>([]);
+
+  const genMut = useMutation({
+    mutationFn: () => generateRedemptionCodes({
+      data: {
+        count: form.count,
+        durationDays: form.durationDays,
+        maxDownloadsPerDay: form.maxDownloadsPerDay,
+        maxRedemptions: form.maxRedemptions ? parseInt(form.maxRedemptions) : undefined,
+        expiresAt: form.expiresAt || undefined,
+      },
+    }),
+    onSuccess: (res) => {
+      toast.success(`Generated ${res.codes.length} codes`);
+      setGenerated(res.codes.map((c: any) => c.code));
+      qc.invalidateQueries({ queryKey: ["admin", "codes"] });
+    },
+    onError: (e: any) => toast.error(e?.message),
+  });
+
+  const toggleMut = useMutation({
+    mutationFn: (v: { codeId: string; isActive: boolean }) => toggleRedemptionCode({ data: v }),
+    onSuccess: () => { toast.success("Updated"); qc.invalidateQueries({ queryKey: ["admin", "codes"] }); },
+    onError: (e: any) => toast.error(e?.message),
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Generate form */}
+      <div className="space-y-4 rounded-3xl border border-white/5 glass p-6">
+        <h3 className="text-sm font-medium">Generate Codes</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-muted-foreground">Number of codes</label>
+            <Input type="number" min={1} max={100} value={form.count} onChange={(e) => setForm({ ...form, count: parseInt(e.target.value) || 1 })} className="mt-1" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Duration (days)</label>
+            <Input type="number" min={1} max={365} value={form.durationDays} onChange={(e) => setForm({ ...form, durationDays: parseInt(e.target.value) || 1 })} className="mt-1" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Max downloads/day</label>
+            <Input type="number" min={1} max={50} value={form.maxDownloadsPerDay} onChange={(e) => setForm({ ...form, maxDownloadsPerDay: parseInt(e.target.value) || 3 })} className="mt-1" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Max redemptions (blank = unlimited)</label>
+            <Input type="number" min={1} value={form.maxRedemptions} onChange={(e) => setForm({ ...form, maxRedemptions: e.target.value })} placeholder="Unlimited" className="mt-1" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Expires at (optional)</label>
+            <Input type="datetime-local" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} className="mt-1" />
+          </div>
+        </div>
+        <Button onClick={() => genMut.mutate()} disabled={genMut.isPending} className="rounded-full bg-brand text-brand-foreground hover:bg-brand/90">
+          {genMut.isPending ? "Generating..." : "Generate Codes"}
+        </Button>
+      </div>
+
+      {/* Generated codes display */}
+      {generated.length > 0 && (
+        <div className="space-y-3 rounded-3xl border border-brand/20 bg-brand/5 p-6">
+          <h3 className="text-sm font-medium text-brand">Generated Codes</h3>
+          <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+            {generated.map((c) => (
+              <div key={c} className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2 font-mono text-sm tracking-wider">
+                {c}
+                <button
+                  type="button"
+                  onClick={() => { navigator.clipboard.writeText(c); toast.success("Copied!"); }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Copy
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">Share these codes with users. They can redeem at Billing → Have a Code?</p>
+        </div>
+      )}
+
+      {/* Existing codes list */}
+      <div>
+        <h3 className="mb-3 text-sm font-medium">Existing Codes</h3>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : (codes ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">No codes generated yet.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-3xl border border-white/5 glass">
+            <table className="w-full text-sm">
+              <thead className="bg-white/5 text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 text-left">Code</th>
+                  <th className="px-4 py-3 text-left">Duration</th>
+                  <th className="px-4 py-3 text-left">Downloads/day</th>
+                  <th className="px-4 py-3 text-left">Redemptions</th>
+                  <th className="px-4 py-3 text-left">Expires</th>
+                  <th className="px-4 py-3 text-left">Active</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(codes ?? []).map((c: any) => (
+                  <tr key={c.id} className="border-t border-white/5">
+                    <td className="px-4 py-3 font-mono tracking-wider">{c.code}</td>
+                    <td className="px-4 py-3">{c.duration_days}d</td>
+                    <td className="px-4 py-3">{c.max_downloads_per_day}</td>
+                    <td className="px-4 py-3">{c.current_redemptions}{c.max_redemptions ? ` / ${c.max_redemptions}` : " / unlimited"}</td>
+                    <td className="px-4 py-3">{c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "Never"}</td>
+                    <td className="px-4 py-3">
+                      <Switch checked={c.is_active} onCheckedChange={(v) => toggleMut.mutate({ codeId: c.id, isActive: v })} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => { navigator.clipboard.writeText(c.code); toast.success("Copied!"); }}
+                        className="text-xs text-brand hover:underline"
+                      >
+                        Copy
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

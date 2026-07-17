@@ -239,12 +239,14 @@ export type Database = {
       payment_history: {
         Row: {
           amount_cents: number
+          code_id: string | null
           created_at: string
           currency: string
           description: string | null
           id: string
           invoice_url: string | null
           paid_at: string | null
+          payment_method: string
           status: string
           stripe_invoice_id: string | null
           stripe_payment_intent_id: string | null
@@ -252,12 +254,14 @@ export type Database = {
         }
         Insert: {
           amount_cents: number
+          code_id?: string | null
           created_at?: string
           currency?: string
           description?: string | null
           id?: string
           invoice_url?: string | null
           paid_at?: string | null
+          payment_method?: string
           status: string
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
@@ -265,12 +269,14 @@ export type Database = {
         }
         Update: {
           amount_cents?: number
+          code_id?: string | null
           created_at?: string
           currency?: string
           description?: string | null
           id?: string
           invoice_url?: string | null
           paid_at?: string | null
+          payment_method?: string
           status?: string
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
@@ -317,6 +323,90 @@ export type Database = {
           status?: string
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      redemption_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          current_redemptions: number
+          duration_days: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_downloads_per_day: number
+          max_redemptions: number | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          current_redemptions?: number
+          duration_days: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_downloads_per_day?: number
+          max_redemptions?: number | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          current_redemptions?: number
+          duration_days?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_downloads_per_day?: number
+          max_redemptions?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_code_redemptions: {
+        Row: {
+          code_id: string
+          id: string
+          redeemed_at: string
+          user_id: string
+        }
+        Insert: {
+          code_id: string
+          id?: string
+          redeemed_at?: string
+          user_id: string
+        }
+        Update: {
+          code_id?: string
+          id?: string
+          redeemed_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      download_tracker: {
+        Row: {
+          download_count: number
+          download_date: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          download_count?: number
+          download_date?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          download_count?: number
+          download_date?: string
+          id?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -368,10 +458,15 @@ export type Database = {
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean
+          code_id: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
+          downloads_reset_at: string | null
+          downloads_today: number
           id: string
+          pawapay_subscription_id: string | null
+          payment_method: string
           plan_id: string
           status: string
           stripe_customer_id: string | null
@@ -381,10 +476,15 @@ export type Database = {
         }
         Insert: {
           cancel_at_period_end?: boolean
+          code_id?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          downloads_reset_at?: string | null
+          downloads_today?: number
           id?: string
+          pawapay_subscription_id?: string | null
+          payment_method?: string
           plan_id?: string
           status?: string
           stripe_customer_id?: string | null
@@ -394,10 +494,15 @@ export type Database = {
         }
         Update: {
           cancel_at_period_end?: boolean
+          code_id?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          downloads_reset_at?: string | null
+          downloads_today?: number
           id?: string
+          pawapay_subscription_id?: string | null
+          payment_method?: string
           plan_id?: string
           status?: string
           stripe_customer_id?: string | null

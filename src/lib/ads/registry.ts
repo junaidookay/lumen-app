@@ -1,10 +1,9 @@
 /**
- * Ad provider abstraction. We do not integrate a real network yet —
- * this module lists what a placement should render for every provider.
- * Premium users always bypass ads.
+ * Ad provider abstraction.
+ * Adsterra is the primary ad network. Premium users always bypass ads.
  */
-export type AdSlot = "banner_top" | "banner_inline" | "pre_roll" | "mid_roll" | "rewarded";
-export type AdProvider = "none" | "house" | "google_ads" | "custom";
+export type AdSlot = "social_bar" | "banner_top" | "banner_inline" | "interstitial" | "popunder";
+export type AdProvider = "none" | "house" | "adsterra";
 
 export interface AdPlacement {
   slot: AdSlot;
@@ -14,16 +13,15 @@ export interface AdPlacement {
 }
 
 export const AD_SLOT_LABELS: Record<AdSlot, string> = {
-  banner_top: "Top banner",
-  banner_inline: "Inline banner",
-  pre_roll: "Pre-roll (video)",
-  mid_roll: "Mid-roll (video)",
-  rewarded: "Rewarded",
+  social_bar: "Social Bar (bottom)",
+  banner_top: "Top Banner",
+  banner_inline: "Inline Banner",
+  interstitial: "Interstitial (pre-play)",
+  popunder: "Pop-under (first visit)",
 };
 
 export const AD_PROVIDERS: { id: AdProvider; label: string; description: string }[] = [
   { id: "none", label: "None", description: "Slot disabled." },
   { id: "house", label: "House ads", description: "Editorial promos from homepage_config." },
-  { id: "google_ads", label: "Google Ads (future)", description: "Reserved — integration not implemented yet." },
-  { id: "custom", label: "Custom provider", description: "Arbitrary provider handled by config.script." },
+  { id: "adsterra", label: "Adsterra", description: "Social bar, popunder, banners, interstitials." },
 ];

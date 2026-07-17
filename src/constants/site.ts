@@ -6,7 +6,7 @@ export const SITE = {
 } as const;
 
 export interface NavLink {
-  to: "/" | "/home" | "/discover" | "/search" | "/install";
+  to: "/" | "/home" | "/discover" | "/search" | "/install" | "/billing";
   label: string;
   exact?: boolean;
 }
@@ -15,6 +15,6 @@ export const NAV_LINKS: readonly NavLink[] = [
   { to: "/", label: "Home", exact: true },
   { to: "/home", label: "Browse" },
   { to: "/discover", label: "Discover" },
-  { to: "/search", label: "Search" },
+  { to: "/billing", label: "Subscribe" },
   { to: "/install", label: "Install" },
 ] as const;
