@@ -123,11 +123,27 @@ CREATE POLICY "Admins see all downloads"
     OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
   );
 
--- 11. Seed ad placements for new slot types
+-- 11. Update ad_placements CHECK constraint to allow new slot types
+DO $$
+BEGIN
+  -- Drop old constraint if it exists
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ad_placements_slot_check' AND conrelid = 'ad_placements'::regclass
+  ) THEN
+    ALTER TABLE ad_placements DROP CONSTRAINT ad_placements_slot_check;
+  END IF;
+END $$;
+
+-- Allow both old and new slot values
+ALTER TABLE ad_placements ADD CONSTRAINT ad_placements_slot_check
+  CHECK (slot IN ('social_bar', 'banner_top', 'banner_inline', 'interstitial', 'popunder', 'pre_roll', 'mid_roll', 'rewarded'));
+
+-- 12. Seed ad placements for new slot types (ignore duplicates)
 INSERT INTO ad_placements (slot, provider, is_enabled, config) VALUES
   ('social_bar', 'none', false, '{}'),
-  ('banner_top', 'none', false, '{}'),
-  ('banner_inline', 'none', false, '{}'),
   ('interstitial', 'none', false, '{}'),
   ('popunder', 'none', false, '{}')
 ON CONFLICT (slot) DO NOTHING;
+
+-- Update existing slots to use adsterra provider option
+UPDATE ad_placements SET provider = 'none' WHERE slot IN ('banner_top', 'banner_inline') AND provider = 'house';
