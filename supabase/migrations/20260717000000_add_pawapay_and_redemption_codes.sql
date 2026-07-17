@@ -49,33 +49,33 @@ ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT
 ALTER TABLE redemption_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_code_redemptions ENABLE ROW LEVEL SECURITY;
 
--- 7. RLS policies for redemption_codes
--- Admins can do everything
-CREATE POLICY IF NOT EXISTS "Admins manage redemption codes"
+-- 7. RLS policies for redemption_codes (drop first if they exist, then create)
+DROP POLICY IF EXISTS "Admins manage redemption codes" ON redemption_codes;
+CREATE POLICY "Admins manage redemption codes"
   ON redemption_codes FOR ALL
   USING (
     EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
     OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
   );
 
--- Anyone can read active, non-expired codes (needed for validation on redeem)
-CREATE POLICY IF NOT EXISTS "Anyone can read active codes"
+DROP POLICY IF EXISTS "Anyone can read active codes" ON redemption_codes;
+CREATE POLICY "Anyone can read active codes"
   ON redemption_codes FOR SELECT
   USING (is_active = true AND (expires_at IS NULL OR expires_at > now()));
 
 -- 8. RLS policies for user_code_redemptions
--- Users can see their own redemptions
-CREATE POLICY IF NOT EXISTS "Users see own redemptions"
+DROP POLICY IF EXISTS "Users see own redemptions" ON user_code_redemptions;
+CREATE POLICY "Users see own redemptions"
   ON user_code_redemptions FOR SELECT
   USING (user_id = auth.uid());
 
--- Users can insert their own redemption
-CREATE POLICY IF NOT EXISTS "Users can redeem codes"
+DROP POLICY IF EXISTS "Users can redeem codes" ON user_code_redemptions;
+CREATE POLICY "Users can redeem codes"
   ON user_code_redemptions FOR INSERT
   WITH CHECK (user_id = auth.uid());
 
--- Admins can see all redemptions
-CREATE POLICY IF NOT EXISTS "Admins see all redemptions"
+DROP POLICY IF EXISTS "Admins see all redemptions" ON user_code_redemptions;
+CREATE POLICY "Admins see all redemptions"
   ON user_code_redemptions FOR SELECT
   USING (
     EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
@@ -100,21 +100,34 @@ COMMENT ON TABLE download_tracker IS 'Tracks daily download counts per user for 
 
 ALTER TABLE download_tracker ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Users see own downloads"
+DROP POLICY IF EXISTS "Users see own downloads" ON download_tracker;
+CREATE POLICY "Users see own downloads"
   ON download_tracker FOR SELECT
   USING (user_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "Users can track downloads"
+DROP POLICY IF EXISTS "Users can track downloads" ON download_tracker;
+CREATE POLICY "Users can track downloads"
   ON download_tracker FOR INSERT
   WITH CHECK (user_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "Users can update own downloads"
+DROP POLICY IF EXISTS "Users can update own downloads" ON download_tracker;
+CREATE POLICY "Users can update own downloads"
   ON download_tracker FOR UPDATE
   USING (user_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "Admins see all downloads"
+DROP POLICY IF EXISTS "Admins see all downloads" ON download_tracker;
+CREATE POLICY "Admins see all downloads"
   ON download_tracker FOR ALL
   USING (
     EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
     OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
   );
+
+-- 11. Seed ad placements for new slot types
+INSERT INTO ad_placements (slot, provider, is_enabled, config) VALUES
+  ('social_bar', 'none', false, '{}'),
+  ('banner_top', 'none', false, '{}'),
+  ('banner_inline', 'none', false, '{}'),
+  ('interstitial', 'none', false, '{}'),
+  ('popunder', 'none', false, '{}')
+ON CONFLICT (slot) DO NOTHING;
