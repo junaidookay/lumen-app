@@ -203,6 +203,60 @@ export type Database = {
         }
         Relationships: []
       }
+      media_items: {
+        Row: {
+          backdrop_path: string | null
+          created_at: string
+          episodes: Json
+          id: string
+          kind: string
+          overview: string | null
+          poster_path: string | null
+          rd_info_hash: string | null
+          rd_torrent_id: string | null
+          status: string
+          title: string
+          tmdb_id: number | null
+          updated_at: string
+          video_url: string | null
+          year: number | null
+        }
+        Insert: {
+          backdrop_path?: string | null
+          created_at?: string
+          episodes?: Json
+          id?: string
+          kind: string
+          overview?: string | null
+          poster_path?: string | null
+          rd_info_hash?: string | null
+          rd_torrent_id?: string | null
+          status?: string
+          title: string
+          tmdb_id?: number | null
+          updated_at?: string
+          video_url?: string | null
+          year?: number | null
+        }
+        Update: {
+          backdrop_path?: string | null
+          created_at?: string
+          episodes?: Json
+          id?: string
+          kind?: string
+          overview?: string | null
+          poster_path?: string | null
+          rd_info_hash?: string | null
+          rd_torrent_id?: string | null
+          status?: string
+          title?: string
+          tmdb_id?: number | null
+          updated_at?: string
+          video_url?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
@@ -697,6 +751,69 @@ export type Database = {
           media_id?: string
           media_kind?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      rd_hash_cache: {
+        Row: {
+          checked_at: string
+          files: Json | null
+          info_hash: string
+          is_cached: boolean
+        }
+        Insert: {
+          checked_at?: string
+          files?: Json | null
+          info_hash: string
+          is_cached?: boolean
+        }
+        Update: {
+          checked_at?: string
+          files?: Json | null
+          info_hash?: string
+          is_cached?: boolean
+        }
+        Relationships: []
+      }
+      resolver_jobs: {
+        Row: {
+          batch_size: number
+          created_at: string
+          created_by: string | null
+          cursor_index: number
+          id: string
+          input_query: string | null
+          job_type: string
+          results: Json
+          stats: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          batch_size?: number
+          created_at?: string
+          created_by?: string | null
+          cursor_index?: number
+          id?: string
+          input_query?: string | null
+          job_type: string
+          results?: Json
+          stats?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          batch_size?: number
+          created_at?: string
+          created_by?: string | null
+          cursor_index?: number
+          id?: string
+          input_query?: string | null
+          job_type?: string
+          results?: Json
+          stats?: Json
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }

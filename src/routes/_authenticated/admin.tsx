@@ -27,6 +27,12 @@ import {
   listRedemptionCodes,
   toggleRedemptionCode,
 } from "@/lib/billing/redemption.functions";
+import {
+  resolveMagnetForContent,
+  searchTorrentsForContent,
+  autoResolveContent,
+} from "@/lib/admin/content-management.functions";
+import { checkRdAccountStatus } from "@/lib/debrid/resolve-stream";
 import { AD_SLOT_LABELS, AD_PROVIDERS } from "@/lib/ads/registry";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -35,11 +41,12 @@ export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
 });
 
-type TabId = "overview" | "users" | "content" | "moderation" | "notifications" | "analytics" | "ads" | "codes" | "audit";
+type TabId = "overview" | "users" | "content" | "moderation" | "notifications" | "analytics" | "ads" | "codes" | "rd" | "audit";
 
 const TABS: { id: TabId; label: string; requiresAdmin?: boolean }[] = [
   { id: "overview", label: "Overview" },
   { id: "users", label: "Users", requiresAdmin: true },
+  { id: "rd", label: "Real Debrid", requiresAdmin: true },
   { id: "content", label: "Content" },
   { id: "moderation", label: "Moderation" },
   { id: "notifications", label: "Notifications" },
@@ -92,6 +99,7 @@ function AdminPage() {
 
         {tab === "overview" && <Overview />}
         {tab === "users" && isAdmin(perms) && <Users />}
+        {tab === "rd" && isAdmin(perms) && <RealDebrid />}
         {tab === "content" && <Content />}
         {tab === "moderation" && <Moderation />}
         {tab === "notifications" && <Notifications />}
@@ -229,6 +237,115 @@ function Users() {
           <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</Button>
           <Button size="sm" variant="ghost" disabled={((data?.rows ?? []).length) < 25} onClick={() => setPage((p) => p + 1)}>Next</Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Real Debrid ----------
+function RealDebrid() {
+  const qc = useQueryClient();
+  const [magnet, setMagnet] = useState("");
+  const [contentId, setContentId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState<"movie" | "tv">("movie");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [resolving, setResolving] = useState(false);
+
+  const rdStatus = useQuery({ queryKey: ["admin", "rd-status"], queryFn: () => checkRdAccountStatus() });
+
+  const resolveMut = useMutation({
+    mutationFn: () => resolveMagnetForContent({ data: { contentId, magnet } }),
+    onSuccess: (res) => {
+      toast.success(`Resolved! ${res.filesCount} files, status: ${res.status}`);
+      setMagnet("");
+      setContentId("");
+      qc.invalidateQueries({ queryKey: ["admin"] });
+    },
+    onError: (e: any) => toast.error(e?.message),
+  });
+
+  const searchMut = useMutation({
+    mutationFn: () => searchTorrentsForContent({ data: { query: searchQuery, type: searchType } }),
+    onSuccess: (res) => setSearchResults(res.results),
+    onError: (e: any) => toast.error(e?.message),
+  });
+
+  const autoMut = useMutation({
+    mutationFn: (args: { contentId: string; query: string; type: "movie" | "tv" }) =>
+      autoResolveContent({ data: args }),
+    onSuccess: (res) => {
+      toast.success(`Auto-resolved: ${res.selectedTorrent} (score: ${res.score})`);
+      qc.invalidateQueries({ queryKey: ["admin"] });
+    },
+    onError: (e: any) => toast.error(e?.message),
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* RD Status */}
+      <div className="rounded-3xl border border-white/5 glass p-6">
+        <h3 className="mb-3 text-sm font-medium">Real Debrid Account</h3>
+        {rdStatus.data?.configured ? (
+          <div className="flex items-center gap-4 text-sm">
+            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">Connected</span>
+            <span className="text-muted-foreground">{rdStatus.data.username}</span>
+            <span className={rdStatus.data.premium ? "text-emerald-300" : "text-amber-300"}>
+              {rdStatus.data.premium ? "Premium" : "Free"}
+            </span>
+            {rdStatus.data.expiration && (
+              <span className="text-muted-foreground">Expires: {new Date(rdStatus.data.expiration).toLocaleDateString()}</span>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground">
+            <p>Not configured. Add <code className="rounded bg-white/5 px-1">REAL_DEBRID_API_KEY</code> to your environment variables.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Resolve Magnet */}
+      <div className="rounded-3xl border border-white/5 glass p-6">
+        <h3 className="mb-3 text-sm font-medium">Resolve Magnet Link</h3>
+        <p className="mb-4 text-xs text-muted-foreground">Paste a magnet link to add it to Real Debrid and link it to a content item.</p>
+        <div className="space-y-3">
+          <Input placeholder="Content ID (UUID)" value={contentId} onChange={(e) => setContentId(e.target.value)} />
+          <Textarea placeholder="magnet:?xt=urn:btih:..." value={magnet} onChange={(e) => setMagnet(e.target.value)} rows={3} />
+          <Button onClick={() => resolveMut.mutate()} disabled={resolving || !magnet || !contentId} className="rounded-full bg-brand text-brand-foreground hover:bg-brand/90">
+            {resolveMut.isPending ? "Resolving..." : "Resolve & Link"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Torrent Search */}
+      <div className="rounded-3xl border border-white/5 glass p-6">
+        <h3 className="mb-3 text-sm font-medium">Search Torrents</h3>
+        <div className="flex gap-2">
+          <Input placeholder="Search query (title)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="flex-1" />
+          <Select value={searchType} onValueChange={(v) => setSearchType(v as any)}>
+            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="movie">Movie</SelectItem>
+              <SelectItem value="tv">TV</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => searchMut.mutate()} disabled={searchMut.isPending || !searchQuery}>
+            {searchMut.isPending ? "Searching..." : "Search"}
+          </Button>
+        </div>
+        {searchResults.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-xs text-muted-foreground">{searchResults.length} results (sorted by score)</p>
+            {searchResults.map((t: any, i: number) => (
+              <div key={i} className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-4 py-2 text-sm">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{t.name}</p>
+                  <p className="text-xs text-muted-foreground">{t.source} · {t.seeders} seeders · {(t.sizeBytes / (1024 ** 3)).toFixed(1)} GB · score: {t.score}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

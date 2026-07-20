@@ -19,6 +19,9 @@ const envSchema = z.object({
   // PawaPay (optional — mobile money for African markets)
   PAWAPAY_API_KEY: z.string().min(1).optional(),
   PAWAPAY_ENVIRONMENT: z.enum(["sandbox", "production"]).optional(),
+
+  // Real Debrid (optional — torrent-to-stream resolution)
+  REAL_DEBRID_API_KEY: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

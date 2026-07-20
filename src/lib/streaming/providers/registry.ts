@@ -1,5 +1,7 @@
 import type { StreamRequest, StreamingSource } from "../types";
 import { sampleProvider } from "./sample";
+import { realDebridProvider } from "./realdebrid";
+import { embedFallbackProvider } from "./embed-fallback";
 
 export interface StreamingProvider {
   id: string;
@@ -8,10 +10,13 @@ export interface StreamingProvider {
 }
 
 /**
- * Provider registry. Add adapters here (Mux, JW, self-hosted, licensed CDN)
- * and the rest of the app immediately sees them — no UI or player changes.
+ * Provider registry. Providers are tried in order — RD first, then embeds, then sample.
  */
-const providers: StreamingProvider[] = [sampleProvider];
+const providers: StreamingProvider[] = [
+  realDebridProvider,
+  embedFallbackProvider,
+  sampleProvider,
+];
 
 export function listProviders(): StreamingProvider[] {
   return providers.slice();
