@@ -72,7 +72,7 @@ function Page() {
             <Row title="Email notifications" description="Occasional emails from Lumen." control={<Switch checked={!!s.email_notifications} onCheckedChange={(v) => setS({ ...s, email_notifications: v })} />} />
           </div>
           <div className="mt-8 flex justify-end">
-            <Button onClick={save} disabled={busy} className="rounded-full bg-brand text-brand-foreground hover:bg-brand/90">{busy ? "Saving…" : "Save preferences"}</Button>
+            <Button onClick={save} disabled={busy} className="rounded-full">{busy ? "Saving…" : "Save preferences"}</Button>
           </div>
         </div>
       </div>

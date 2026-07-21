@@ -124,7 +124,7 @@ function AuthPage() {
                 <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" required minLength={8} />
               </div>
             )}
-            <Button type="submit" disabled={busy} className="w-full rounded-full bg-brand text-brand-foreground hover:bg-brand/90">
+            <Button type="submit" disabled={busy} className="w-full rounded-full">
               {busy ? "Please wait…" : mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : "Send reset link"}
             </Button>
           </form>

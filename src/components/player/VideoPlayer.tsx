@@ -756,7 +756,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
               <button
                 type="button"
                 onClick={() => upNext.onPlay()}
-                className="flex-1 rounded-full bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground hover:bg-brand/90"
+                className="flex-1 rounded-full bg-gradient-to-r from-[#1a5fb4] to-[#e65100] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
               >
                 Play now
               </button>

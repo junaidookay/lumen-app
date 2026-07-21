@@ -55,7 +55,7 @@ export function MovieHero({ item }: { item: MediaItem }) {
             </div>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-foreground/85 sm:text-lg">{item.overview}</p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button asChild size="lg" className="rounded-full bg-brand text-brand-foreground shadow-[var(--shadow-glow)] hover:bg-brand/90">
+              <Button asChild size="lg" className="rounded-full shadow-[var(--shadow-glow)]">
                 <Link to="/watch/$kind/$id" params={{ kind: item.kind, id: item.id }} search={{ season: 1, episode: 1 }}>
                   <Play className="mr-2 h-4 w-4 fill-current" /> Play now
                 </Link>

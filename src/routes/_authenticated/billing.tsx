@@ -253,7 +253,7 @@ function BillingPage() {
                       {active ? (
                         <span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-medium text-brand">Current plan</span>
                       ) : purchasable ? (
-                        <Button onClick={() => startCheckout(plan.id)} disabled={checkoutBusy === plan.id} className="rounded-full bg-brand text-brand-foreground hover:bg-brand/90">
+                        <Button onClick={() => startCheckout(plan.id)} disabled={checkoutBusy === plan.id} className="rounded-full">
                           {checkoutBusy === plan.id ? "Redirecting..." : "Upgrade"}
                         </Button>
                       ) : plan.id !== "free" && !plan.stripe_price_id ? (
@@ -326,7 +326,7 @@ function BillingPage() {
               <Button
                 onClick={startPawaPay}
                 disabled={pawaPayBusy || !phone || !!pawaPayPolling}
-                className="w-full rounded-full bg-brand text-brand-foreground hover:bg-brand/90"
+                className="w-full rounded-full"
               >
                 {pawaPayBusy ? "Initiating..." : pawaPayPolling ? "Waiting for payment..." : "Pay Now"}
               </Button>
@@ -362,7 +362,7 @@ function BillingPage() {
                 <Button
                   onClick={handleRedeemCode}
                   disabled={redeeming || !code.trim()}
-                  className="rounded-full bg-brand text-brand-foreground hover:bg-brand/90"
+                  className="rounded-full"
                 >
                   {redeeming ? "Redeeming..." : "Redeem"}
                 </Button>

@@ -78,7 +78,7 @@ export function HeroCarousel({ items, interval = 7000 }: HeroCarouselProps) {
                 {active.overview}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Button size="lg" className="rounded-full bg-brand text-brand-foreground shadow-[var(--shadow-glow)] hover:bg-brand/90">
+                <Button size="lg" className="rounded-full shadow-[var(--shadow-glow)]">
                   <Play className="mr-2 h-4 w-4 fill-current" /> Play
                 </Button>
                 <Button size="lg" variant="secondary" className="rounded-full glass border border-white/10 hover:bg-white/10">

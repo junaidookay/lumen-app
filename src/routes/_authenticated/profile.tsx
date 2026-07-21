@@ -66,7 +66,7 @@ function Page() {
           </div>
           <div><Label htmlFor="bio">Bio</Label><Textarea id="bio" value={bio} onChange={(e) => setBio(e.target.value)} rows={4} maxLength={500} /></div>
           <div><Label>Email</Label><Input value={user?.email ?? ""} disabled /></div>
-          <Button type="submit" disabled={busy} className="rounded-full bg-brand text-brand-foreground hover:bg-brand/90">{busy ? "Saving…" : "Save changes"}</Button>
+          <Button type="submit" disabled={busy} className="rounded-full">{busy ? "Saving…" : "Save changes"}</Button>
         </form>
       </div>
     </AppShell>

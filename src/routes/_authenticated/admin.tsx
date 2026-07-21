@@ -311,7 +311,7 @@ function RealDebrid() {
         <div className="space-y-3">
           <Input placeholder="Content ID (UUID)" value={contentId} onChange={(e) => setContentId(e.target.value)} />
           <Textarea placeholder="magnet:?xt=urn:btih:..." value={magnet} onChange={(e) => setMagnet(e.target.value)} rows={3} />
-          <Button onClick={() => resolveMut.mutate()} disabled={resolving || !magnet || !contentId} className="rounded-full bg-brand text-brand-foreground hover:bg-brand/90">
+          <Button onClick={() => resolveMut.mutate()} disabled={resolving || !magnet || !contentId} className="rounded-full">
             {resolveMut.isPending ? "Resolving..." : "Resolve & Link"}
           </Button>
         </div>
@@ -579,7 +579,7 @@ function Codes() {
             <Input type="datetime-local" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} className="mt-1" />
           </div>
         </div>
-        <Button onClick={() => genMut.mutate()} disabled={genMut.isPending} className="rounded-full bg-brand text-brand-foreground hover:bg-brand/90">
+        <Button onClick={() => genMut.mutate()} disabled={genMut.isPending} className="rounded-full">
           {genMut.isPending ? "Generating..." : "Generate Codes"}
         </Button>
       </div>

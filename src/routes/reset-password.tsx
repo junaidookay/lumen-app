@@ -43,7 +43,7 @@ function ResetPage() {
               <Label htmlFor="pw">New password</Label>
               <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
             </div>
-            <Button type="submit" disabled={busy} className="w-full rounded-full bg-brand text-brand-foreground hover:bg-brand/90">
+            <Button type="submit" disabled={busy} className="w-full rounded-full">
               {busy ? "Saving…" : "Update password"}
             </Button>
           </form>

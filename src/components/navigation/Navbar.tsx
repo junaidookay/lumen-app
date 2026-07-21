@@ -73,7 +73,7 @@ export function Navbar() {
               to="/billing"
               aria-label="Subscribe"
               data-touch-target
-              className="hidden rounded-full bg-brand px-4 py-2 text-xs font-medium text-brand-foreground shadow-[var(--shadow-glow)] hover:bg-brand/90 md:inline-flex"
+              className="hidden h-10 items-center justify-center rounded-full bg-gradient-to-r from-[#1a5fb4] to-[#e65100] px-4 text-xs font-medium text-white shadow-[var(--shadow-glow)] hover:opacity-90 md:inline-flex"
             >
               Subscribe
             </Link>

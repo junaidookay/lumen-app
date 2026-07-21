@@ -126,7 +126,7 @@ function InstallPage() {
               <Button
                 size="lg"
                 onClick={handleInstall}
-                className="rounded-full bg-brand px-8 text-brand-foreground shadow-[var(--shadow-glow)] hover:bg-brand/90"
+                className="rounded-full px-8 shadow-[var(--shadow-glow)]"
               >
                 <Download className="mr-2 h-4 w-4" />
                 Install Lumen
