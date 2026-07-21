@@ -83,11 +83,11 @@
   --popover: oklch(0.17 0.02 275);
   --popover-foreground: oklch(0.97 0.01 280);
 
-  --primary: oklch(0.72 0.19 25);
+  --primary: oklch(0.55 0.19 250);
   --primary-foreground: oklch(0.99 0 0);
-  --brand: oklch(0.72 0.19 25);
+  --brand: oklch(0.55 0.19 250);
   --brand-foreground: oklch(0.99 0 0);
-  --brand-glow: oklch(0.78 0.21 20);
+  --brand-glow: oklch(0.62 0.20 245);
 
   --secondary: oklch(0.26 0.025 275);
   --secondary-foreground: oklch(0.97 0.01 280);
@@ -99,7 +99,7 @@
   --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.72 0.19 25 / 60%);
+  --ring: oklch(0.55 0.19 250 / 60%);
 
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -108,20 +108,20 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.16 0.018 275);
   --sidebar-foreground: oklch(0.97 0.01 280);
-  --sidebar-primary: oklch(0.72 0.19 25);
+  --sidebar-primary: oklch(0.55 0.19 250);
   --sidebar-primary-foreground: oklch(0.99 0 0);
   --sidebar-accent: oklch(0.24 0.025 275);
   --sidebar-accent-foreground: oklch(0.97 0.01 280);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.72 0.19 25 / 60%);
+  --sidebar-ring: oklch(0.55 0.19 250 / 60%);
 
   --gradient-hero: linear-gradient(180deg, transparent 0%, oklch(0.14 0.015 275 / 0.4) 45%, oklch(0.14 0.015 275) 100%);
-  --gradient-brand: linear-gradient(135deg, oklch(0.72 0.19 25), oklch(0.68 0.22 340));
-  --gradient-radial: radial-gradient(ellipse at top, oklch(0.28 0.08 25 / 0.35), transparent 60%);
+  --gradient-brand: linear-gradient(135deg, oklch(0.55 0.19 250), oklch(0.65 0.20 45));
+  --gradient-radial: radial-gradient(ellipse at top, oklch(0.30 0.08 250 / 0.30), transparent 60%);
 
   --shadow-soft: 0 10px 30px -12px oklch(0 0 0 / 0.5);
   --shadow-elevated: 0 20px 60px -20px oklch(0 0 0 / 0.7);
-  --shadow-glow: 0 0 60px -10px oklch(0.72 0.19 25 / 0.45);
+  --shadow-glow: 0 0 60px -10px oklch(0.55 0.19 250 / 0.45);
 }
 
 .dark {
@@ -153,7 +153,7 @@
   }
 
   ::selection {
-    background: oklch(0.72 0.19 25 / 0.35);
+    background: oklch(0.55 0.19 250 / 0.35);
     color: oklch(0.99 0 0);
   }
 
