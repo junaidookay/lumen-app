@@ -685,6 +685,9 @@ export function VideoPlayer(props: VideoPlayerProps) {
         playsInline
         preload="metadata"
         crossOrigin="anonymous"
+        onLoadedMetadata={(e) => {
+          e.currentTarget.removeAttribute("poster");
+        }}
       >
         {source?.container !== "hls" &&
           source?.subtitles.map((s) => (

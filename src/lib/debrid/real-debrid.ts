@@ -1,6 +1,12 @@
 /**
- * Real Debrid API client — server-only. Ported from CinefloTV's real-debrid Edge Function.
+ * Real Debrid API client — server-only.
  * All RD communication goes through here; the API key never touches the client.
+ *
+ * Critical notes:
+ * - rdFetch reads as text first (RD sometimes returns empty 200 OK)
+ * - unrestrictLink accepts clientIp (RD URLs are IP-locked)
+ * - getTranscodedUrl uses /downloads list ID (unrestrict IDs don't work with /streaming/transcode)
+ * - Transcode response uses `apple` not `hls`, quality keys nested under each format
  */
 import type { RdTorrentInfo, RdUnrestrictedLink, RdUserInfo } from "./types";
 
@@ -19,65 +25,74 @@ function rdHeaders(): Record<string, string> {
   };
 }
 
+// ---- Safe fetch helper (handles empty bodies) ----
+
+async function rdFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${RD_API}${path}`, init);
+  if (!res.ok) {
+    let msg = `RD ${init?.method ?? "GET"} ${path} failed (${res.status})`;
+    try {
+      const body = await res.json();
+      if (body?.error) msg = body.error;
+    } catch {}
+    throw new Error(msg);
+  }
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
+}
+
 // ---- User ----
 
 export async function checkRdStatus(): Promise<RdUserInfo> {
-  const res = await fetch(`${RD_API}/user`, { headers: { Authorization: `Bearer ${getApiKey()}` } });
-  if (!res.ok) throw new Error("Invalid Real Debrid API key");
-  return res.json();
+  return rdFetch<RdUserInfo>("/user", {
+    headers: { Authorization: `Bearer ${getApiKey()}` },
+  });
 }
 
 // ---- Torrents ----
 
 export async function addMagnet(magnet: string): Promise<{ id: string }> {
-  const res = await fetch(`${RD_API}/torrents/addMagnet`, {
+  return rdFetch<{ id: string }>("/torrents/addMagnet", {
     method: "POST",
     headers: rdHeaders(),
     body: `magnet=${encodeURIComponent(magnet)}`,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as any).error || "Failed to add magnet");
-  }
-  return res.json();
 }
 
 export async function selectFiles(torrentId: string, files = "all"): Promise<void> {
-  const res = await fetch(`${RD_API}/torrents/selectFiles/${torrentId}`, {
+  await rdFetch(`/torrents/selectFiles/${torrentId}`, {
     method: "POST",
     headers: rdHeaders(),
     body: `files=${files}`,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as any).error || "Failed to select files");
-  }
 }
 
 export async function getTorrentInfo(torrentId: string): Promise<RdTorrentInfo> {
-  const res = await fetch(`${RD_API}/torrents/info/${torrentId}`, {
+  return rdFetch<RdTorrentInfo>(`/torrents/info/${torrentId}`, {
     headers: { Authorization: `Bearer ${getApiKey()}` },
   });
-  if (!res.ok) throw new Error(`Failed to get torrent info (${res.status})`);
-  return res.json();
 }
 
-export async function unrestrictLink(link: string): Promise<RdUnrestrictedLink> {
-  const res = await fetch(`${RD_API}/unrestrict/link`, {
+/**
+ * Unrestrict an RD short link. Pass clientIp so the resulting URL works
+ * from the user's browser (RD download URLs are IP-locked).
+ */
+export async function unrestrictLink(
+  link: string,
+  clientIp?: string,
+): Promise<RdUnrestrictedLink> {
+  const body = new URLSearchParams({ link });
+  if (clientIp) body.set("ip", clientIp);
+  return rdFetch<RdUnrestrictedLink>("/unrestrict/link", {
     method: "POST",
     headers: rdHeaders(),
-    body: `link=${encodeURIComponent(link)}`,
+    body: body.toString(),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as any).error || `Unrestrict failed (${res.status})`);
-  }
-  return res.json();
 }
 
 /**
  * Full magnet resolution flow: add magnet → select files → wait → get torrent info.
- * Returns the torrent info when ready, or throws if it fails.
  */
 export async function addMagnetAndWait(
   magnet: string,
@@ -99,51 +114,105 @@ export async function addMagnetAndWait(
   throw new Error("Torrent did not become ready in time");
 }
 
-// ---- Transcoding ----
+// ---- Downloads list (needed for transcode ID lookup) ----
 
-function extractCandidateUrls(obj: any): string[] {
-  if (!obj || typeof obj !== "object") return [];
-  const preferredKeys = ["full", "hd", "sd", "720p", "1080p", "360p"];
-  const urls: string[] = [];
-  for (const k of preferredKeys) {
-    const v = obj[k];
-    if (typeof v === "string") urls.push(v);
-  }
-  for (const v of Object.values(obj)) {
-    if (typeof v === "string") urls.push(v);
-  }
-  return [...new Set(urls)];
+/**
+ * Fetch the user's downloads list. The /streaming/transcode endpoint requires
+ * the download ID from THIS list — the unrestrict/link ID does NOT work.
+ */
+export async function getDownloadsList(limit = 500): Promise<any[]> {
+  return rdFetch<any[]>(`/downloads?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${getApiKey()}` },
+  });
 }
 
-export async function getTranscodedUrl(id: string): Promise<string | null> {
-  const tryIds = [id];
-  if (id.length > 2 && /\d{2}$/.test(id)) tryIds.push(id.slice(0, -2));
+/**
+ * Find the download ID that matches a given restricted link or download URL.
+ * Returns the download ID string suitable for /streaming/transcode/{id}.
+ */
+export async function findDownloadId(restrictedLink: string): Promise<string | null> {
+  const downloads = await getDownloadsList(500);
+  // The restricted link looks like https://real-debrid.com/d/SHORTCODE
+  const shortCode = restrictedLink.split("/d/")[1]?.split("?")[0]?.split("/")[0];
+  if (!shortCode) return null;
 
-  for (const candidateId of tryIds) {
-    const res = await fetch(`${RD_API}/streaming/transcode/${candidateId}`, {
+  const match = downloads.find((d: any) => {
+    const dl = d.download || "";
+    const generated = d.generated || "";
+    return dl.includes(shortCode) || generated.includes(shortCode);
+  });
+  return match?.id ?? null;
+}
+
+// ---- Transcoding ----
+
+/**
+ * Best-effort URL extraction from a transcode quality map.
+ * The response shape is { "full": "https://...", "720": "https://...", ... }.
+ * We prefer numeric keys sorted descending (highest quality first).
+ */
+function bestTranscodedUrl(obj: any): string | null {
+  if (!obj || typeof obj !== "object") return null;
+  const keys = Object.keys(obj)
+    .filter((k) => {
+      const v = obj[k];
+      return typeof v === "string" && v.startsWith("http");
+    })
+    .sort((a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      if (!isNaN(na) && !isNaN(nb)) return nb - na;
+      if (a === "full") return -1;
+      if (b === "full") return 1;
+      return 0;
+    });
+  return keys.length > 0 ? obj[keys[0]] : null;
+}
+
+/**
+ * Get a transcoded stream URL for the given download ID.
+ *
+ * IMPORTANT: The `id` parameter MUST be a download ID from /downloads?limit=500,
+ * NOT the unrestrict/link ID. The /streaming/transcode endpoint returns
+ * wrong_parameter error (code 2) with unrestrict IDs.
+ *
+ * Response shape:
+ * {
+ *   "apple":    { "full": "https://...full.m3u8" },
+ *   "dash":     { "full": "https://...full.mpd" },
+ *   "liveMP4":  { "full": "https://...full.mp4" },
+ *   "h264WebM": { "full": "https://...full.webm" }
+ * }
+ *
+ * Key name is `apple` NOT `hls`.
+ */
+export async function getTranscodedUrl(downloadId: string): Promise<string | null> {
+  try {
+    const data = await rdFetch<any>(`/streaming/transcode/${downloadId}`, {
       headers: { Authorization: `Bearer ${getApiKey()}` },
     });
-    if (!res.ok) continue;
-    const data = (await res.json().catch(() => null)) as any;
-    if (!data) continue;
+    if (!data) return null;
 
+    // Priority: liveMP4 (browser-native) > apple/HLS > dash > h264WebM
     const candidates = [
-      ...extractCandidateUrls(data.liveMP4),
-      ...extractCandidateUrls(data.apple),
-      ...extractCandidateUrls(data.hls),
-    ];
+      bestTranscodedUrl(data.liveMP4),
+      bestTranscodedUrl(data.apple),
+      bestTranscodedUrl(data.dash),
+      bestTranscodedUrl(data.h264WebM),
+    ].filter(Boolean) as string[];
 
     for (const url of candidates) {
       if (await isTranscodedPlayable(url)) return url;
     }
+  } catch {
+    // Transcode not available for this download — fall through
   }
-
   return null;
 }
 
 async function isTranscodedPlayable(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { method: "GET", headers: { Range: "bytes=0-1" } });
+    const res = await fetch(url, { method: "HEAD" });
     const ct = res.headers.get("content-type") || "";
     if (ct.includes("application/json") || ct.includes("text/json")) return false;
     return res.ok;
@@ -159,12 +228,12 @@ export async function checkInstantAvailability(
 ): Promise<Record<string, { cached: boolean; files?: any[] }>> {
   if (hashes.length === 0) return {};
   const hashParam = hashes.join("/");
-  const res = await fetch(`${RD_API}/torrents/instantAvailability/${hashParam}`, {
-    headers: { Authorization: `Bearer ${getApiKey()}` },
-  });
-  if (!res.ok) {
-    if (res.status === 429) throw new Error("RD rate limited");
+  try {
+    return await rdFetch<Record<string, { cached: boolean; files?: any[] }>>(
+      `/torrents/instantAvailability/${hashParam}`,
+      { headers: { Authorization: `Bearer ${getApiKey()}` } },
+    );
+  } catch {
     return {};
   }
-  return res.json();
 }

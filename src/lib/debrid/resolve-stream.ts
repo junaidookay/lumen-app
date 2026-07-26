@@ -1,23 +1,40 @@
 /**
  * Stream resolver — resolves content to playable URLs via Real Debrid.
- * Ported from CinefloTV's resolve-stream Edge Function.
  *
- * Flow:
- * 1. Check if content has rd_torrent_id (RD dynamic) or stored URL (legacy)
- * 2. Fetch torrent info from RD
- * 3. Find the correct link (by rd_link_index for TV, or first video for movies)
- * 4. Unrestrict the RD link → direct download URL
- * 5. Optionally get transcoded MP4 for better browser compatibility
+ * CRITICAL flow (all these are RD gotchas):
+ * 1. Fetch torrent info from RD
+ * 2. Find the correct link (by rd_link_index for TV, or first video for movies)
+ * 3. Unrestrict the RD link WITH CLIENT IP (RD URLs are IP-locked)
+ * 4. Get download ID from /downloads list (unrestrict ID doesn't work for transcode)
+ * 5. Get transcoded stream from /streaming/transcode/{downloadId}
+ * 6. Parse `apple` (not `hls`) for HLS, or `liveMP4` for progressive MP4
  */
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import {
   getTorrentInfo,
   unrestrictLink,
   getTranscodedUrl,
+  findDownloadId,
 } from "./real-debrid";
 import { buildTvEpisodesFromTorrentInfo, findEpisodeLinkIndex, findFirstVideoLinkIndex } from "./episode-parser";
 import type { StreamResolution, RdResolveError } from "./types";
+
+// ---- Client IP extraction ----
+
+function getClientIp(): string | undefined {
+  try {
+    const request = getRequest();
+    const xfwd = request?.headers?.get("x-forwarded-for");
+    if (xfwd) return xfwd.split(",")[0].trim();
+    const realIp = request?.headers?.get("x-real-ip");
+    if (realIp) return realIp;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 // ---- Internal helpers ----
 
@@ -39,6 +56,7 @@ async function resolveFromTorrentInfo(
   content: any,
   season: number | undefined,
   episode: number | undefined,
+  clientIp?: string,
 ): Promise<{ stream_url?: string; error?: string; retryable?: boolean; episodes?: any[] }> {
   if (torrentInfo.status !== "downloaded") {
     return { error: `Torrent not ready (${torrentInfo.status})`, retryable: true };
@@ -47,6 +65,7 @@ async function resolveFromTorrentInfo(
     return { error: "No links available in torrent", retryable: false };
   }
 
+  // Pick the right link index
   let linkIndex = 0;
   if (content.kind === "tv" && season !== undefined && episode !== undefined) {
     const episodes = Array.isArray(content.episodes) ? content.episodes : [];
@@ -61,16 +80,27 @@ async function resolveFromTorrentInfo(
     linkIndex = findFirstVideoLinkIndex(torrentInfo);
   }
 
-  const unrestricted = await unrestrictLink(torrentInfo.links[linkIndex]);
-  const url = unrestricted.download;
+  // Unrestrict WITH CLIENT IP (RD URLs are IP-locked to the requester)
+  const restrictedLink = torrentInfo.links[linkIndex];
+  const unrestricted = await unrestrictLink(restrictedLink, clientIp);
+  const directUrl = unrestricted.download;
 
-  // Try transcoding for browser-friendly MP4
-  if (unrestricted.streamable === 1 && unrestricted.id) {
-    const transcoded = await getTranscodedUrl(unrestricted.id);
-    if (transcoded) return { stream_url: transcoded };
+  // Try transcoding for browser-compatible streams
+  // IMPORTANT: The unrestrict ID does NOT work with /streaming/transcode.
+  // We must look up the download ID from /downloads list instead.
+  if (unrestricted.streamable === 1) {
+    try {
+      const downloadId = await findDownloadId(restrictedLink);
+      if (downloadId) {
+        const transcoded = await getTranscodedUrl(downloadId);
+        if (transcoded) return { stream_url: transcoded };
+      }
+    } catch {
+      // Transcode unavailable — fall back to direct URL
+    }
   }
 
-  return { stream_url: url };
+  return { stream_url: directUrl };
 }
 
 // ---- Server function: resolve stream for content ----
@@ -100,6 +130,9 @@ export const resolveStream = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<StreamResolution | RdResolveError> => {
     const { contentId, kind, season, episode, rdTorrentId, rdInfoHash, episodes, videoEmbedUrl } = data;
 
+    // Get client IP for unrestrict (RD URLs are IP-locked)
+    const clientIp = getClientIp();
+
     // No RD torrent — try stored URL or legacy
     if (!rdTorrentId) {
       if (kind === "tv" && season !== undefined && episode !== undefined && Array.isArray(episodes)) {
@@ -123,7 +156,6 @@ export const resolveStream = createServerFn({ method: "POST" })
       if (rdInfoHash) {
         const readd = await readdTorrent(rdInfoHash);
         if (readd.error) return { error: readd.error, retryable: true };
-        // TODO: update stored rd_torrent_id in calling code
         try {
           torrentInfo = await getTorrentInfo(readd.torrentId!);
         } catch {
@@ -145,6 +177,7 @@ export const resolveStream = createServerFn({ method: "POST" })
       { kind, episodes: builtEpisodes || episodes },
       season,
       episode,
+      clientIp,
     );
 
     if (result.error) return result as RdResolveError;
