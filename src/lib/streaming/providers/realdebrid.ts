@@ -39,8 +39,9 @@ async function resolveRdSources(req: StreamRequest): Promise<StreamingSource[]> 
 
     // Determine container from URL
     const url = result.stream_url;
-    let container: "mp4" | "webm" | "hls" = "mp4";
+    let container: "mp4" | "webm" | "hls" | "dash" = "mp4";
     if (url.includes(".m3u8")) container = "hls";
+    else if (url.includes(".mpd")) container = "dash";
     else if (url.includes(".webm")) container = "webm";
 
     return [

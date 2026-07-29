@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Hls from "hls.js";
 import type { HlsConfig, Level, MediaPlaylist } from "hls.js";
+import * as dashjs from "dashjs";
 import {
   Play,
   Pause,
@@ -115,6 +116,10 @@ export function VideoPlayer(props: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const dashRef = useRef<dashjs.MediaPlayerClass | null>(null);
+  const dashBaseUrlRef = useRef<string | null>(null);
+  const dashTimeOffsetRef = useRef(0);
+  const fullDurationRef = useRef(0);
   const triedRef = useRef<string[]>([]);
   const resumedRef = useRef(false);
 
@@ -182,10 +187,18 @@ export function VideoPlayer(props: VideoPlayerProps) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      if (dashRef.current) {
+        dashRef.current.reset();
+        dashRef.current = null;
+      }
+      dashBaseUrlRef.current = null;
+      dashTimeOffsetRef.current = 0;
+      fullDurationRef.current = 0;
     };
     cleanup();
 
     const isHls = source.container === "hls" || source.url.endsWith(".m3u8");
+    const isDash = source.container === "dash" || source.url.endsWith(".mpd");
     const canNativeHls = video.canPlayType("application/vnd.apple.mpegurl") !== "";
 
     trackPlayback({
@@ -243,6 +256,34 @@ export function VideoPlayer(props: VideoPlayerProps) {
           if (!cancelled) setError((err as Error).message || "Failed to load stream.");
         }
       })();
+    } else if (isDash && typeof MediaSource !== "undefined") {
+      // DASH path — RD uses DASH with ?t=<seconds> for server-side seeking
+      const baseUrl = source.url.replace(/\?t=\d+/, "");
+      dashBaseUrlRef.current = baseUrl;
+      let seekReinitLock = false;
+      const initDash = (url: string) => {
+        if (dashRef.current) { dashRef.current.reset(); dashRef.current = null; }
+        const player = dashjs.MediaPlayer().create();
+        player.updateSettings({
+          streaming: { buffer: { bufferTimeAtTopQuality: 30, bufferTimeAtTopQualityLongForm: 60 } },
+        });
+        player.initialize(video, url, true);
+        dashRef.current = player;
+      };
+      initDash(baseUrl);
+      const onSeeking = () => {
+        if (seekReinitLock) return;
+        const displayTime = dashTimeOffsetRef.current + video.currentTime;
+        const seekTime = Math.floor(displayTime);
+        if (seekTime > 0 && Math.abs(seekTime - dashTimeOffsetRef.current) > 2) {
+          seekReinitLock = true;
+          dashTimeOffsetRef.current = seekTime;
+          initDash(`${baseUrl}?t=${seekTime}`);
+          setTimeout(() => { seekReinitLock = false; }, 2000);
+        }
+      };
+      video.addEventListener("seeking", onSeeking);
+      (video as any).__dashSeekCleanup = () => video.removeEventListener("seeking", onSeeking);
     } else {
       // Native path (MP4 / Safari HLS)
       video.src = source.url;
@@ -251,6 +292,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
 
     return () => {
       cancelled = true;
+      if ((video as any).__dashSeekCleanup) { (video as any).__dashSeekCleanup(); delete (video as any).__dashSeekCleanup; }
       cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -288,23 +330,27 @@ export function VideoPlayer(props: VideoPlayerProps) {
     const v = videoRef.current;
     if (!v) return;
     const onLoaded = () => {
-      setDuration(v.duration || 0);
+      const dur = v.duration || 0;
+      // For DASH with ?t= offset, v.duration is remaining time; capture full duration on first load
+      if (fullDurationRef.current === 0) fullDurationRef.current = dur;
+      setDuration(dashTimeOffsetRef.current > 0 ? fullDurationRef.current : dur);
       setLoading(false);
-      if (!resumedRef.current && resumeSeconds > 1 && resumeSeconds < (v.duration || Infinity) - 5) {
+      if (!resumedRef.current && resumeSeconds > 1 && resumeSeconds < (dur + dashTimeOffsetRef.current) - 5) {
         v.currentTime = resumeSeconds;
       }
       resumedRef.current = true;
       v.playbackRate = preferences.playbackSpeed;
     };
     const onTime = () => {
-      setCurrentTime(v.currentTime);
+      const displayTime = dashTimeOffsetRef.current + v.currentTime;
+      setCurrentTime(displayTime);
       const b = v.buffered;
       if (b.length) setBuffered(b.end(b.length - 1));
-      const dur = v.duration || 0;
+      const dur = fullDurationRef.current || v.duration || 0;
       if (dur > 0) {
-        const pct = v.currentTime / dur;
+        const pct = displayTime / dur;
         onProgress?.({
-          positionSeconds: v.currentTime,
+          positionSeconds: displayTime,
           durationSeconds: dur,
           percent: pct,
           sourceId: source?.id ?? "",
@@ -314,12 +360,12 @@ export function VideoPlayer(props: VideoPlayerProps) {
           mediaKind,
           season,
           episode,
-          positionSeconds: v.currentTime,
+          positionSeconds: displayTime,
           durationSeconds: dur,
         });
         // Up-next window: last 30s and TV episode
-        if (upNext && dur - v.currentTime <= 30 && !v.paused) setUpNextVisible(true);
-        else if (dur - v.currentTime > 30) setUpNextVisible(false);
+        if (upNext && dur - displayTime <= 30 && !v.paused) setUpNextVisible(true);
+        else if (dur - displayTime > 30) setUpNextVisible(false);
       }
     };
     const onPlayEv = () => {
@@ -498,7 +544,11 @@ export function VideoPlayer(props: VideoPlayerProps) {
     (delta: number) => {
       const v = videoRef.current;
       if (!v) return;
-      const next = Math.max(0, Math.min((v.duration || 0) - 0.1, v.currentTime + delta));
+      const displayTime = dashTimeOffsetRef.current + v.currentTime;
+      const maxDur = fullDurationRef.current || v.duration || 0;
+      const next = Math.max(0, Math.min(maxDur - 0.1, displayTime + delta));
+      // For DASH, set userSeekRef so the seeking handler uses the correct target
+      (videoRef.current as any).__userSeekTarget = next;
       v.currentTime = next;
       trackPlayback({
         name: "playback.seek",
