@@ -137,9 +137,11 @@ export async function findDownloadId(restrictedLink: string): Promise<string | n
   if (!shortCode) return null;
 
   const match = downloads.find((d: any) => {
+    // d.link is the restricted link URL — most reliable match
+    const link = d.link || "";
     const dl = d.download || "";
     const generated = d.generated || "";
-    return dl.includes(shortCode) || generated.includes(shortCode);
+    return link.includes(shortCode) || dl.includes(shortCode) || generated.includes(shortCode);
   });
   return match?.id ?? null;
 }
