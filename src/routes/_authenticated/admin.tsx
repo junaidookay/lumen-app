@@ -56,6 +56,8 @@ import {
   importTmdbSeasons,
   searchTorrentsForContent,
   autoResolveContent,
+  listMediaItemsForAdmin,
+  checkInstantAvailabilityForHashes,
 } from "@/lib/admin/content-management.functions";
 import { checkRdAccountStatus } from "@/lib/debrid/resolve-stream";
 import { AD_SLOT_LABELS, AD_PROVIDERS } from "@/lib/ads/registry";
@@ -456,109 +458,144 @@ function Users() {
 // ---------- Real Debrid ----------
 function RealDebrid() {
   const qc = useQueryClient();
+  const [selectedContentId, setSelectedContentId] = useState("");
+  const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [magnet, setMagnet] = useState("");
-  const [contentId, setContentId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<"movie" | "tv">("movie");
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [resolving, setResolving] = useState(false);
-  const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
-  const [seasons, setSeasons] = useState<
-    { number: number; hasRd: boolean; name?: string; episodeCount?: number }[]
-  >([]);
-  const [contentKind, setContentKind] = useState<"movie" | "tv">("movie");
+  const [instantCache, setInstantCache] = useState<Record<string, boolean>>({});
+  const [filterCached, setFilterCached] = useState(false);
+  const [resolvingHash, setResolvingHash] = useState<string | null>(null);
+  const [savingHash, setSavingHash] = useState<string | null>(null);
 
   const rdStatus = useQuery({
     queryKey: ["admin", "rd-status"],
     queryFn: () => checkRdAccountStatus(),
   });
 
-  // When content ID changes, fetch kind + existing seasons
-  const fetchContentInfo = async () => {
-    if (!contentId) {
-      setSeasons([]);
-      return;
-    }
-    try {
+  const titlesQuery = useQuery({
+    queryKey: ["admin", "media-items"],
+    queryFn: () => listMediaItemsForAdmin(),
+  });
+
+  const selectedTitle = titlesQuery.data?.find((t: any) => t.id === selectedContentId);
+  const isTV = selectedTitle?.kind === "tv";
+
+  // Fetch seasons when a TV title is selected
+  const { data: seasonRows } = useQuery({
+    queryKey: ["admin", "seasons", selectedContentId],
+    queryFn: async () => {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: content } = await supabaseAdmin
-        .from("media_items")
-        .select("id, kind, tmdb_id")
-        .eq("id", contentId)
-        .single();
-      if (!content) return;
-      setContentKind((content.kind || "movie") as "movie" | "tv");
+      const { data } = await (supabaseAdmin as any)
+        .from("media_item_seasons")
+        .select("season_number, rd_torrent_id, episodes, name")
+        .eq("media_item_id", selectedContentId)
+        .order("season_number");
+      return data ?? [];
+    },
+    enabled: isTV && !!selectedContentId,
+  });
 
-      if (content.kind === "tv") {
-        const { data: seasonRows } = await (supabaseAdmin as any)
-          .from("media_item_seasons")
-          .select("season_number, rd_torrent_id, episodes, name")
-          .eq("media_item_id", contentId)
-          .order("season_number");
+  const seasons = (seasonRows ?? []).map((s: any) => ({
+    number: s.season_number as number,
+    hasRd: !!s.rd_torrent_id,
+    name: s.name as string | null,
+    episodeCount: Array.isArray(s.episodes) ? s.episodes.length : 0,
+  })) as Array<{ number: number; hasRd: boolean; name: string | null; episodeCount: number }>;
 
-        setSeasons(
-          (seasonRows ?? []).map((s: any) => ({
-            number: s.season_number,
-            hasRd: !!(s as any).rd_torrent_id,
-            name: s.name,
-            episodeCount: Array.isArray(s.episodes) ? s.episodes.length : 0,
-          })),
-        );
-      } else {
-        setSeasons([]);
-      }
-    } catch {
-      // Table may not exist yet
-    }
-  };
-
+  // Resolve magnet mutation
   const resolveMut = useMutation({
     mutationFn: async () => {
-      if (selectedSeason && contentKind === "tv") {
+      if (selectedSeason && isTV) {
         return resolveMagnetForSeason({
-          data: { mediaItemId: contentId, seasonNumber: selectedSeason, magnet },
+          data: { mediaItemId: selectedContentId, seasonNumber: selectedSeason, magnet },
         });
       }
-      return resolveMagnetForContent({ data: { contentId, magnet } });
+      return resolveMagnetForContent({ data: { contentId: selectedContentId, magnet } });
     },
     onSuccess: (res: any) => {
       toast.success(`Resolved! ${res.filesCount ?? 0} files, status: ${res.status}`);
       setMagnet("");
-      setContentId("");
-      setSelectedSeason(null);
-      setSeasons([]);
       qc.invalidateQueries({ queryKey: ["admin"] });
     },
     onError: (e: any) => toast.error(e?.message),
   });
 
+  // Import TMDB seasons mutation
   const importTmdbMut = useMutation({
-    mutationFn: () => importTmdbSeasons({ data: { mediaItemId: contentId } }),
+    mutationFn: () => importTmdbSeasons({ data: { mediaItemId: selectedContentId } }),
     onSuccess: (res) => {
       toast.success(
         `Imported ${res.seasonsImported} seasons, ${res.episodesImported} episodes from TMDB`,
       );
       qc.invalidateQueries({ queryKey: ["admin"] });
-      fetchContentInfo();
     },
     onError: (e: any) => toast.error(e?.message),
   });
 
+  // Search torrents mutation
   const searchMut = useMutation({
     mutationFn: () => searchTorrentsForContent({ data: { query: searchQuery, type: searchType } }),
-    onSuccess: (res) => setSearchResults(res.results),
-    onError: (e: any) => toast.error(e?.message),
-  });
-
-  const autoMut = useMutation({
-    mutationFn: (args: { contentId: string; query: string; type: "movie" | "tv" }) =>
-      autoResolveContent({ data: args }),
-    onSuccess: (res) => {
-      toast.success(`Auto-resolved: ${res.selectedTorrent} (score: ${res.score})`);
-      qc.invalidateQueries({ queryKey: ["admin"] });
+    onSuccess: async (res) => {
+      setSearchResults(res.results);
+      // Check instant availability for all results
+      const hashes = res.results.map((t: any) => t.info_hash).filter(Boolean);
+      if (hashes.length > 0) {
+        try {
+          const avail = await checkInstantAvailabilityForHashes({ data: { hashes } });
+          const cache: Record<string, boolean> = {};
+          for (const [hash, info] of Object.entries(avail)) {
+            cache[hash.toLowerCase()] = !!(info as any).cached;
+          }
+          setInstantCache(cache);
+        } catch {
+          // Ignore availability check errors
+        }
+      }
     },
     onError: (e: any) => toast.error(e?.message),
   });
+
+  // Resolve from search result
+  const resolveFromSearch = async (torrent: any) => {
+    if (!selectedContentId) {
+      toast.error("Select a title first");
+      return;
+    }
+    setResolvingHash(torrent.info_hash);
+    try {
+      if (selectedSeason && isTV) {
+        await resolveMagnetForSeason({
+          data: {
+            mediaItemId: selectedContentId,
+            seasonNumber: selectedSeason,
+            magnet: torrent.magnet,
+          },
+        });
+      } else {
+        await resolveMagnetForContent({
+          data: { contentId: selectedContentId, magnet: torrent.magnet },
+        });
+      }
+      toast.success(`Resolved: ${torrent.name}`);
+      qc.invalidateQueries({ queryKey: ["admin"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Resolve failed");
+    } finally {
+      setResolvingHash(null);
+    }
+  };
+
+  const filteredResults = filterCached
+    ? searchResults.filter((t: any) => instantCache[t.info_hash?.toLowerCase()])
+    : searchResults;
+  const cachedCount = searchResults.filter(
+    (t: any) => instantCache[t.info_hash?.toLowerCase()],
+  ).length;
+
+  const inputCls =
+    "h-9 rounded-full border border-white/10 bg-white/5 px-4 text-sm placeholder:text-muted-foreground focus:border-brand focus:outline-none";
 
   return (
     <div className="space-y-6">
@@ -581,44 +618,40 @@ function RealDebrid() {
             )}
           </div>
         ) : (
-          <div className="text-sm text-muted-foreground">
-            <p>
-              Not configured. Add{" "}
-              <code className="rounded bg-white/5 px-1">REAL_DEBRID_API_KEY</code> to your
-              environment variables.
-            </p>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Not configured. Add <code className="rounded bg-white/5 px-1">REAL_DEBRID_API_KEY</code>{" "}
+            to your environment variables.
+          </p>
         )}
       </div>
 
-      {/* Resolve Magnet */}
+      {/* Step 1: Select title */}
       <div className="rounded-3xl border border-white/5 glass p-6">
-        <h3 className="mb-3 text-sm font-medium">Resolve Magnet Link</h3>
+        <h3 className="mb-1 text-sm font-medium">1. Select a title to attach</h3>
         <p className="mb-4 text-xs text-muted-foreground">
-          Paste a magnet link to add it to Real Debrid and link it to a content item.
+          Choose an existing title from your library, then paste a magnet or search for torrents
+          below.
         </p>
         <div className="space-y-3">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Content ID (UUID)"
-              value={contentId}
-              onChange={(e) => setContentId(e.target.value)}
-              onBlur={() => fetchContentInfo()}
-            />
-            {contentId && contentKind === "tv" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fetchContentInfo()}
-                className="flex-shrink-0"
-              >
-                Load seasons
-              </Button>
-            )}
-          </div>
+          <select
+            className="w-full h-10 px-3 rounded-lg bg-white/[0.03] border border-hairline text-sm"
+            value={selectedContentId}
+            onChange={(e) => {
+              setSelectedContentId(e.target.value);
+              setSelectedSeason(null);
+            }}
+          >
+            <option value="">— Select a title —</option>
+            {(titlesQuery.data ?? []).map((t: any) => (
+              <option key={t.id} value={t.id}>
+                {t.title} ({t.kind}
+                {t.year ? `, ${t.year}` : ""}){t.rd_torrent_id ? " ✓ RD" : ""}
+              </option>
+            ))}
+          </select>
 
           {/* Season selector for TV */}
-          {contentKind === "tv" && seasons.length > 0 && (
+          {isTV && seasons.length > 0 && (
             <div className="space-y-2">
               <label className="text-xs text-muted-foreground">Save to season (optional)</label>
               <select
@@ -636,130 +669,181 @@ function RealDebrid() {
                   </option>
                 ))}
               </select>
-              {selectedSeason && (
+              {selectedSeason ? (
                 <p className="text-xs text-muted-foreground">
                   Magnet will be saved to Season {selectedSeason} only.
                 </p>
-              )}
-              {!selectedSeason && (
+              ) : (
                 <p className="text-xs text-muted-foreground">
-                  Leave blank to save to title level (covers all seasons from one magnet).
+                  Leave blank to save at title level (one magnet covers all seasons).
                 </p>
               )}
             </div>
           )}
 
-          <Textarea
-            placeholder="magnet:?xt=urn:btih:..."
-            value={magnet}
-            onChange={(e) => setMagnet(e.target.value)}
-            rows={3}
-          />
-          <div className="flex gap-2">
-            <Button
-              onClick={() => resolveMut.mutate()}
-              disabled={resolveMut.isPending || !magnet || !contentId}
-              className="rounded-full"
-            >
-              {resolveMut.isPending
-                ? "Resolving..."
-                : selectedSeason
-                  ? `Resolve & Link S${selectedSeason}`
-                  : "Resolve & Link"}
-            </Button>
-            {contentKind === "tv" && contentId && (
-              <Button
-                variant="outline"
-                onClick={() => importTmdbMut.mutate()}
-                disabled={importTmdbMut.isPending}
-                className="rounded-full"
-              >
-                {importTmdbMut.isPending ? "Importing..." : "Import TMDB Seasons"}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Season status table */}
-        {contentKind === "tv" && seasons.length > 0 && (
-          <div className="mt-4 overflow-x-auto rounded-xl border border-white/5">
-            <table className="w-full text-sm">
-              <thead className="bg-white/5 text-xs uppercase tracking-[0.15em] text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 text-left">Season</th>
-                  <th className="px-3 py-2 text-left">Status</th>
-                  <th className="px-3 py-2 text-left">Episodes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {seasons.map((s) => (
-                  <tr key={s.number} className="border-t border-white/5">
-                    <td className="px-3 py-2">
-                      S{s.number}
-                      {s.name ? ` — ${s.name}` : ""}
-                    </td>
-                    <td className="px-3 py-2">
-                      {s.hasRd ? (
-                        <span className="text-emerald-300 text-xs">✓ RD linked</span>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">No magnet</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground text-xs">
-                      {s.episodeCount ?? 0} eps
-                    </td>
+          {/* Season status table */}
+          {isTV && seasons.length > 0 && (
+            <div className="overflow-x-auto rounded-xl border border-white/5">
+              <table className="w-full text-sm">
+                <thead className="bg-white/5 text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Season</th>
+                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">Episodes</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {seasons.map((s) => (
+                    <tr key={s.number} className="border-t border-white/5">
+                      <td className="px-3 py-2">
+                        S{s.number}
+                        {s.name ? ` — ${s.name}` : ""}
+                      </td>
+                      <td className="px-3 py-2">
+                        {s.hasRd ? (
+                          <span className="text-emerald-300 text-xs">✓ RD linked</span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">No magnet</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground text-xs">
+                        {s.episodeCount ?? 0} eps
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Torrent Search */}
+      {/* Step 2: Search or paste magnet */}
       <div className="rounded-3xl border border-white/5 glass p-6">
-        <h3 className="mb-3 text-sm font-medium">Search Torrents</h3>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Search query (title)"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1"
-          />
-          <Select value={searchType} onValueChange={(v) => setSearchType(v as any)}>
-            <SelectTrigger className="w-28">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="movie">Movie</SelectItem>
-              <SelectItem value="tv">TV</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={() => searchMut.mutate()} disabled={searchMut.isPending || !searchQuery}>
-            {searchMut.isPending ? "Searching..." : "Search"}
-          </Button>
-        </div>
-        {searchResults.length > 0 && (
-          <div className="mt-4 space-y-2">
-            <p className="text-xs text-muted-foreground">
-              {searchResults.length} results (sorted by score)
-            </p>
-            {searchResults.map((t: any, i: number) => (
-              <div
-                key={i}
-                className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-4 py-2 text-sm"
+        <h3 className="mb-1 text-sm font-medium">2. Search or paste magnet</h3>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Search for torrents or paste a magnet link directly.
+        </p>
+
+        <div className="space-y-4">
+          {/* Torrent search */}
+          <div>
+            <p className="text-xs font-medium mb-2">Torrent Search</p>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search by title name…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchQuery && searchMut.mutate()}
+                className="flex-1"
+              />
+              <Select value={searchType} onValueChange={(v) => setSearchType(v as any)}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="movie">Movie</SelectItem>
+                  <SelectItem value="tv">TV</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => searchMut.mutate()}
+                disabled={searchMut.isPending || !searchQuery}
               >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{t.name}</p>
+                {searchMut.isPending ? "Searching…" : "Search"}
+              </Button>
+            </div>
+
+            {searchResults.length > 0 && (
+              <div className="mt-3">
+                <div className="flex items-center gap-3 mb-2">
                   <p className="text-xs text-muted-foreground">
-                    {t.source} · {t.seeders} seeders · {(t.sizeBytes / 1024 ** 3).toFixed(1)} GB ·
-                    score: {t.score}
+                    {filteredResults.length} results ({cachedCount} cached)
                   </p>
+                  <button
+                    onClick={() => setFilterCached(!filterCached)}
+                    className={`text-xs px-2 py-0.5 rounded-full border transition ${filterCached ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-white/10 text-muted-foreground hover:bg-white/5"}`}
+                  >
+                    {filterCached ? "Cached only" : "Show all"}
+                  </button>
+                </div>
+                <div className="max-h-[420px] overflow-y-auto space-y-1">
+                  {filteredResults.map((t: any, i: number) => {
+                    const isCached = instantCache[t.info_hash?.toLowerCase()];
+                    const isResolving = resolvingHash === t.info_hash;
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center gap-3 rounded-xl bg-white/[0.03] px-3 py-2 text-sm"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{t.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {t.source} · {t.seeders} seeders ·{" "}
+                            {(t.sizeBytes / 1024 ** 3).toFixed(1)} GB · score: {t.score}
+                          </p>
+                        </div>
+                        {isCached !== undefined && (
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${isCached ? "bg-emerald-500/10 text-emerald-300" : "bg-amber-500/10 text-amber-300"}`}
+                          >
+                            {isCached ? "Cached" : "Not cached"}
+                          </span>
+                        )}
+                        <Button
+                          size="sm"
+                          variant={isCached ? "default" : "outline"}
+                          disabled={!selectedContentId || isResolving}
+                          onClick={() => resolveFromSearch(t)}
+                          className="flex-shrink-0"
+                        >
+                          {isResolving ? "Resolving…" : "Resolve"}
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
+            )}
+            {searchMut.data && searchResults.length === 0 && (
+              <p className="text-sm text-muted-foreground py-4">No results found.</p>
+            )}
           </div>
-        )}
+
+          {/* Manual magnet paste */}
+          <div className="border-t border-white/5 pt-4">
+            <p className="text-xs font-medium mb-2">Or paste a magnet link directly</p>
+            <Textarea
+              placeholder="magnet:?xt=urn:btih:..."
+              value={magnet}
+              onChange={(e) => setMagnet(e.target.value)}
+              rows={3}
+            />
+            <div className="flex gap-2 mt-2">
+              <Button
+                onClick={() => resolveMut.mutate()}
+                disabled={resolveMut.isPending || !magnet || !selectedContentId}
+                className="rounded-full"
+              >
+                {resolveMut.isPending
+                  ? "Resolving…"
+                  : selectedSeason
+                    ? `Resolve & Link S${selectedSeason}`
+                    : "Resolve & Link"}
+              </Button>
+              {isTV && selectedContentId && (
+                <Button
+                  variant="outline"
+                  onClick={() => importTmdbMut.mutate()}
+                  disabled={importTmdbMut.isPending}
+                  className="rounded-full"
+                >
+                  {importTmdbMut.isPending ? "Importing…" : "Import TMDB Seasons"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

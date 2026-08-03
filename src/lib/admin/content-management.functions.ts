@@ -456,3 +456,34 @@ export const autoResolveContent = createServerFn({ method: "POST" })
       episodes,
     };
   });
+
+// ---- List media items for admin dropdown ----
+
+export const listMediaItemsForAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await ensureAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("media_items")
+      .select("id, title, kind, year, rd_torrent_id")
+      .order("title");
+    return (data ?? []) as Array<{
+      id: string;
+      title: string;
+      kind: string;
+      year: number | null;
+      rd_torrent_id: string | null;
+    }>;
+  });
+
+// ---- Check instant availability for a list of info hashes ----
+
+export const checkInstantAvailabilityForHashes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { hashes: string[] }) => z.object({ hashes: z.array(z.string()) }).parse(d))
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context.supabase, context.userId);
+    const { checkInstantAvailability } = await import("@/lib/debrid/real-debrid");
+    return checkInstantAvailability(data.hashes);
+  });
