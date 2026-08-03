@@ -32,23 +32,32 @@ CREATE INDEX IF NOT EXISTS idx_mis_torrent ON media_item_seasons(rd_torrent_id) 
 ALTER TABLE media_item_seasons ENABLE ROW LEVEL SECURITY;
 
 -- 4. Published seasons are publicly readable
-CREATE POLICY "Public read published seasons" ON media_item_seasons
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM media_items WHERE id = media_item_id AND status = 'published')
-  );
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public read published seasons' AND tablename = 'media_item_seasons') THEN
+    CREATE POLICY "Public read published seasons" ON media_item_seasons
+      FOR SELECT USING (
+        EXISTS (SELECT 1 FROM media_items WHERE id = media_item_id AND status = 'published')
+      );
+  END IF;
+END $$;
 
 -- 5. Staff can manage seasons
-CREATE POLICY "Staff manage seasons" ON media_item_seasons
-  FOR ALL USING (
-    EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'moderator'))
-    OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
-  );
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Staff manage seasons' AND tablename = 'media_item_seasons') THEN
+    CREATE POLICY "Staff manage seasons" ON media_item_seasons
+      FOR ALL USING (
+        EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'moderator'))
+        OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+      );
+  END IF;
+END $$;
 
 -- 6. updated_at trigger
 CREATE OR REPLACE FUNCTION public.set_media_item_seasons_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
 
+DROP TRIGGER IF EXISTS media_item_seasons_updated_at ON media_item_seasons;
 CREATE TRIGGER media_item_seasons_updated_at
   BEFORE UPDATE ON media_item_seasons
   FOR EACH ROW EXECUTE FUNCTION public.set_media_item_seasons_updated_at();
