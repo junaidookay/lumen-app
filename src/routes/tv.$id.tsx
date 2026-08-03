@@ -68,7 +68,10 @@ function TVDetail() {
     setActiveSeason(visibleSeasons[0].seasonNumber);
   }
 
-  const seasonNumber = visibleSeasons.find((s) => s.seasonNumber === activeSeason)?.seasonNumber ?? visibleSeasons[0]?.seasonNumber ?? 1;
+  const seasonNumber =
+    visibleSeasons.find((s) => s.seasonNumber === activeSeason)?.seasonNumber ??
+    visibleSeasons[0]?.seasonNumber ??
+    1;
   const seasonDetail = useQuery(seasonQuery(show.id, seasonNumber));
   const season = seasonDetail.data ?? visibleSeasons.find((s) => s.seasonNumber === seasonNumber);
 
@@ -81,7 +84,9 @@ function TVDetail() {
           <section>
             <h2 className="mb-4 text-2xl font-semibold tracking-tight">Cast</h2>
             <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-              {show.cast.map((c: any, i: number) => <CastCard key={c.id} member={c} index={i} />)}
+              {show.cast.map((c: any, i: number) => (
+                <CastCard key={c.id} member={c} index={i} />
+              ))}
             </div>
           </section>
         )}
@@ -90,7 +95,11 @@ function TVDetail() {
           <section>
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-2xl font-semibold tracking-tight">Episodes</h2>
-              <SeasonSelector seasons={visibleSeasons} activeSeason={activeSeason} onChange={setActiveSeason} />
+              <SeasonSelector
+                seasons={visibleSeasons}
+                activeSeason={activeSeason}
+                onChange={setActiveSeason}
+              />
             </div>
             <EpisodeList episodes={season.episodes} keyId={`${show.id}-s${activeSeason}`} />
           </section>
@@ -98,7 +107,9 @@ function TVDetail() {
 
         {visibleSeasons.length === 0 && (
           <section className="text-center py-16">
-            <p className="text-muted-foreground">No episodes available yet. Content is being processed.</p>
+            <p className="text-muted-foreground">
+              No episodes available yet. Content is being processed.
+            </p>
           </section>
         )}
 
@@ -114,7 +125,9 @@ function TVDetail() {
         <section className="mx-auto max-w-[1400px] px-4 py-16 sm:px-6 lg:px-10">
           <h2 className="mb-4 text-2xl font-semibold tracking-tight">Reviews</h2>
           <div className="grid gap-3 md:grid-cols-2">
-            {show.reviews.slice(0, 4).map((r: any) => <ReviewCard key={r.id} review={r} />)}
+            {show.reviews.slice(0, 4).map((r: any) => (
+              <ReviewCard key={r.id} review={r} />
+            ))}
           </div>
         </section>
       ) : null}

@@ -18,20 +18,30 @@ async function ensureAdmin(supabase: any, userId: string) {
   let ok = roles.includes("admin");
   if (!ok) {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: profile } = await supabaseAdmin.from("profiles").select("is_admin").eq("id", userId).maybeSingle();
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", userId)
+      .maybeSingle();
     if (profile?.is_admin) {
       ok = true;
-      await supabaseAdmin.from("user_roles").upsert(
-        { user_id: userId, role: "admin", granted_by: userId },
-        { onConflict: "user_id,role" },
-      );
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert(
+          { user_id: userId, role: "admin", granted_by: userId },
+          { onConflict: "user_id,role" },
+        );
     }
   }
   if (!ok) throw new Error("Forbidden");
 }
 
 /** Enrich new episodes with existing TMDB titles (preserve rd_link_index). */
-async function enrichWithExistingTitles(supabaseAdmin: any, contentId: string, builtEpisodes: any[]): Promise<any[]> {
+async function enrichWithExistingTitles(
+  supabaseAdmin: any,
+  contentId: string,
+  builtEpisodes: any[],
+): Promise<any[]> {
   try {
     const { data: existingSeasons } = await supabaseAdmin
       .from("media_item_seasons")
@@ -40,7 +50,12 @@ async function enrichWithExistingTitles(supabaseAdmin: any, contentId: string, b
     const existingTitleMap = new Map<string, string>();
     for (const s of existingSeasons ?? []) {
       for (const ep of (s.episodes ?? []) as any[]) {
-        if (ep.title && !ep.title.includes(".") && !ep.title.startsWith("Episode ") && !ep.title.match(/^\d{1,4}$/)) {
+        if (
+          ep.title &&
+          !ep.title.includes(".") &&
+          !ep.title.startsWith("Episode ") &&
+          !ep.title.match(/^\d{1,4}$/)
+        ) {
           existingTitleMap.set(`${s.season_number}:${ep.episode}`, ep.title);
         }
       }
@@ -59,14 +74,13 @@ async function enrichWithExistingTitles(supabaseAdmin: any, contentId: string, b
 
 export const resolveMagnetForContent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: {
-    contentId: string;
-    magnet: string;
-  }) =>
-    z.object({
-      contentId: z.string().uuid(),
-      magnet: z.string().min(10),
-    }).parse(d),
+  .validator((d: { contentId: string; magnet: string }) =>
+    z
+      .object({
+        contentId: z.string().uuid(),
+        magnet: z.string().min(10),
+      })
+      .parse(d),
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context.supabase, context.userId);
@@ -103,7 +117,11 @@ export const resolveMagnetForContent = createServerFn({ method: "POST" })
       update.episodes = episodes;
     }
     // If movie, set the first video URL
-    if (content?.kind === "movie" && torrentInfo.status === "downloaded" && torrentInfo.links?.length > 0) {
+    if (
+      content?.kind === "movie" &&
+      torrentInfo.status === "downloaded" &&
+      torrentInfo.links?.length > 0
+    ) {
       const { unrestrictLink } = await import("../debrid/real-debrid");
       const unrestricted = await unrestrictLink(torrentInfo.links[0]);
       update.video_url = unrestricted.download;
@@ -120,17 +138,23 @@ export const resolveMagnetForContent = createServerFn({ method: "POST" })
         seasonGroups.set(ep.season, list);
       }
       for (const [seasonNum, seasonEps] of seasonGroups) {
-        await (supabaseAdmin as any).from("media_item_seasons").upsert({
-          media_item_id: data.contentId,
-          season_number: seasonNum,
-          rd_torrent_id: torrentId,
-          rd_info_hash: torrentInfo.hash,
-          episodes: seasonEps,
-          rd_resolved_at: new Date().toISOString(),
-        }, { onConflict: "media_item_id,season_number" });
+        await (supabaseAdmin as any).from("media_item_seasons").upsert(
+          {
+            media_item_id: data.contentId,
+            season_number: seasonNum,
+            rd_torrent_id: torrentId,
+            rd_info_hash: torrentInfo.hash,
+            episodes: seasonEps,
+            rd_resolved_at: new Date().toISOString(),
+          },
+          { onConflict: "media_item_id,season_number" },
+        );
       }
       // Update seasons_count on media_items
-      await supabaseAdmin.from("media_items").update({ seasons_count: seasonGroups.size } as any).eq("id", data.contentId);
+      await supabaseAdmin
+        .from("media_items")
+        .update({ seasons_count: seasonGroups.size } as any)
+        .eq("id", data.contentId);
     }
 
     return {
@@ -146,16 +170,14 @@ export const resolveMagnetForContent = createServerFn({ method: "POST" })
 
 export const resolveMagnetForSeason = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: {
-    mediaItemId: string;
-    seasonNumber: number;
-    magnet: string;
-  }) =>
-    z.object({
-      mediaItemId: z.string().uuid(),
-      seasonNumber: z.number().min(1),
-      magnet: z.string().min(10),
-    }).parse(d),
+  .validator((d: { mediaItemId: string; seasonNumber: number; magnet: string }) =>
+    z
+      .object({
+        mediaItemId: z.string().uuid(),
+        seasonNumber: z.number().min(1),
+        magnet: z.string().min(10),
+      })
+      .parse(d),
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context.supabase, context.userId);
@@ -172,31 +194,42 @@ export const resolveMagnetForSeason = createServerFn({ method: "POST" })
     // Enrich with existing TMDB titles
     episodes = await enrichWithExistingTitles(supabaseAdmin, data.mediaItemId, episodes);
 
-    await (supabaseAdmin as any).from("media_item_seasons").upsert({
-      media_item_id: data.mediaItemId,
-      season_number: data.seasonNumber,
-      rd_torrent_id: torrentId,
-      rd_info_hash: torrentInfo.hash,
-      episodes,
-      rd_resolved_at: new Date().toISOString(),
-    }, { onConflict: "media_item_id,season_number" });
+    await (supabaseAdmin as any).from("media_item_seasons").upsert(
+      {
+        media_item_id: data.mediaItemId,
+        season_number: data.seasonNumber,
+        rd_torrent_id: torrentId,
+        rd_info_hash: torrentInfo.hash,
+        episodes,
+        rd_resolved_at: new Date().toISOString(),
+      },
+      { onConflict: "media_item_id,season_number" },
+    );
 
     // Update seasons_count
     const { count } = await (supabaseAdmin as any)
-      .from("media_item_seasons").select("id", { count: "exact", head: true })
+      .from("media_item_seasons")
+      .select("id", { count: "exact", head: true })
       .eq("media_item_id", data.mediaItemId);
-    await supabaseAdmin.from("media_items").update({ seasons_count: count ?? 0 } as any).eq("id", data.mediaItemId);
+    await supabaseAdmin
+      .from("media_items")
+      .update({ seasons_count: count ?? 0 } as any)
+      .eq("id", data.mediaItemId);
 
-    return { ok: true, status: torrentInfo.status, torrentId, episodes, filesCount: torrentInfo.files?.length ?? 0 };
+    return {
+      ok: true,
+      status: torrentInfo.status,
+      torrentId,
+      episodes,
+      filesCount: torrentInfo.files?.length ?? 0,
+    };
   });
 
 // ---- Import TMDB seasons & episodes metadata ----
 
 export const importTmdbSeasons = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { mediaItemId: string }) =>
-    z.object({ mediaItemId: z.string().uuid() }).parse(d),
-  )
+  .validator((d: { mediaItemId: string }) => z.object({ mediaItemId: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     await ensureAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -209,16 +242,22 @@ export const importTmdbSeasons = createServerFn({ method: "POST" })
 
     if (!mediaItem) throw new Error("Media item not found");
     if (mediaItem.kind !== "tv") throw new Error("TMDB season import is only for TV shows");
-    if (!mediaItem.tmdb_id) throw new Error("No TMDB ID set on this title. Add it via the content editor first.");
+    if (!mediaItem.tmdb_id)
+      throw new Error("No TMDB ID set on this title. Add it via the content editor first.");
 
     const tmdbId = mediaItem.tmdb_id;
     const { tmdbFetch } = await import("@/lib/tmdb/client.server");
 
     // Fetch show details to get season list
-    const show = await tmdbFetch<any>(`/tv/${tmdbId}`, { query: { append_to_response: "seasons" } });
+    const show = await tmdbFetch<any>(`/tv/${tmdbId}`, {
+      query: { append_to_response: "seasons" },
+    });
     const tmdbSeasons = (show.seasons ?? []) as Array<{
-      season_number: number; name: string; overview: string;
-      poster_path: string | null; air_date: string | null;
+      season_number: number;
+      name: string;
+      overview: string;
+      poster_path: string | null;
+      air_date: string | null;
     }>;
 
     let seasonsImported = 0;
@@ -244,15 +283,20 @@ export const importTmdbSeasons = createServerFn({ method: "POST" })
 
       if (existingSeason) {
         // Only enrich metadata, don't overwrite episodes/RD data
-        await (supabaseAdmin as any).from("media_item_seasons").update(seasonMeta)
+        await (supabaseAdmin as any)
+          .from("media_item_seasons")
+          .update(seasonMeta)
           .eq("id", existingSeason.id);
       } else {
-        await (supabaseAdmin as any).from("media_item_seasons").upsert({
-          media_item_id: data.mediaItemId,
-          season_number: s.season_number,
-          ...seasonMeta,
-          episodes: [],
-        }, { onConflict: "media_item_id,season_number" });
+        await (supabaseAdmin as any).from("media_item_seasons").upsert(
+          {
+            media_item_id: data.mediaItemId,
+            season_number: s.season_number,
+            ...seasonMeta,
+            episodes: [],
+          },
+          { onConflict: "media_item_id,season_number" },
+        );
       }
       seasonsImported++;
 
@@ -260,8 +304,12 @@ export const importTmdbSeasons = createServerFn({ method: "POST" })
       try {
         const epData = await tmdbFetch<any>(`/tv/${tmdbId}/season/${s.season_number}`);
         const tmdbEps = (epData.episodes ?? []) as Array<{
-          episode_number: number; name: string; overview: string;
-          still_path: string | null; air_date: string | null; runtime: number | null;
+          episode_number: number;
+          name: string;
+          overview: string;
+          still_path: string | null;
+          air_date: string | null;
+          runtime: number | null;
         }>;
 
         // Enrich existing episodes with TMDB titles (preserve rd_link_index)
@@ -281,7 +329,9 @@ export const importTmdbSeasons = createServerFn({ method: "POST" })
             if (tmdb && tmdb.title) return { ...ep, title: tmdb.title };
             return ep;
           });
-          await (supabaseAdmin as any).from("media_item_seasons").update({ episodes: enriched })
+          await (supabaseAdmin as any)
+            .from("media_item_seasons")
+            .update({ episodes: enriched })
             .eq("id", existingSeason.id);
         }
         episodesImported += tmdbEps.length;
@@ -292,9 +342,13 @@ export const importTmdbSeasons = createServerFn({ method: "POST" })
 
     // Update seasons_count on media_items
     const { count } = await (supabaseAdmin as any)
-      .from("media_item_seasons").select("id", { count: "exact", head: true })
+      .from("media_item_seasons")
+      .select("id", { count: "exact", head: true })
       .eq("media_item_id", data.mediaItemId);
-    await supabaseAdmin.from("media_items").update({ seasons_count: count ?? 0, tmdb_id: tmdbId } as any).eq("id", data.mediaItemId);
+    await supabaseAdmin
+      .from("media_items")
+      .update({ seasons_count: count ?? 0, tmdb_id: tmdbId } as any)
+      .eq("id", data.mediaItemId);
 
     return { ok: true, seasonsImported, episodesImported };
   });
@@ -335,16 +389,14 @@ export const searchTorrentsForContent = createServerFn({ method: "POST" })
 
 export const autoResolveContent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: {
-    contentId: string;
-    query: string;
-    type: "movie" | "tv";
-  }) =>
-    z.object({
-      contentId: z.string().uuid(),
-      query: z.string().min(1),
-      type: z.enum(["movie", "tv"]),
-    }).parse(d),
+  .validator((d: { contentId: string; query: string; type: "movie" | "tv" }) =>
+    z
+      .object({
+        contentId: z.string().uuid(),
+        query: z.string().min(1),
+        type: z.enum(["movie", "tv"]),
+      })
+      .parse(d),
   )
   .handler(async ({ context, data }) => {
     await ensureAdmin(context.supabase, context.userId);
@@ -383,7 +435,11 @@ export const autoResolveContent = createServerFn({ method: "POST" })
       rd_info_hash: torrentInfo.hash,
     };
     if (episodes && episodes.length > 0) update.episodes = episodes;
-    if (data.type === "movie" && torrentInfo.status === "downloaded" && torrentInfo.links?.length > 0) {
+    if (
+      data.type === "movie" &&
+      torrentInfo.status === "downloaded" &&
+      torrentInfo.links?.length > 0
+    ) {
       const { unrestrictLink } = await import("../debrid/real-debrid");
       const unrestricted = await unrestrictLink(torrentInfo.links[0]);
       update.video_url = unrestricted.download;

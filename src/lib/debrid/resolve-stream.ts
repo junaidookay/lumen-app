@@ -12,13 +12,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { getTorrentInfo, unrestrictLink, getTranscodedUrl, findDownloadId } from "./real-debrid";
 import {
-  getTorrentInfo,
-  unrestrictLink,
-  getTranscodedUrl,
-  findDownloadId,
-} from "./real-debrid";
-import { buildTvEpisodesFromTorrentInfo, findEpisodeLinkIndex, findFirstVideoLinkIndex } from "./episode-parser";
+  buildTvEpisodesFromTorrentInfo,
+  findEpisodeLinkIndex,
+  findFirstVideoLinkIndex,
+} from "./episode-parser";
 import type { StreamResolution, RdResolveError } from "./types";
 
 // ---- Client IP extraction ----
@@ -77,7 +76,7 @@ async function tryParallelTranscode(
       const url = await getTranscodedUrl(downloadId);
       if (!url) throw new Error("no transcode url");
       return url;
-    })
+    }),
   );
 
   for (const r of results) {
@@ -121,7 +120,8 @@ async function resolveFromTorrentInfo(
   const directUrl = unrestricted.download;
 
   // Skip transcode for H.264 MP4 — direct download is faster
-  const filename = torrentInfo.files?.[linkIndex]?.path ?? torrentInfo.files?.[linkIndex]?.name ?? "";
+  const filename =
+    torrentInfo.files?.[linkIndex]?.path ?? torrentInfo.files?.[linkIndex]?.name ?? "";
   const isH264Mp4 = /(\.mp4|\.m4v)/.test(filename) && /(x264|h264|avc|bluray)/i.test(filename);
   if (isH264Mp4) {
     return { stream_url: directUrl };
@@ -139,29 +139,33 @@ async function resolveFromTorrentInfo(
 // ---- Server function: resolve stream for content ----
 
 export const resolveStream = createServerFn({ method: "POST" })
-  .validator((d: {
-    contentId: string;
-    kind: "movie" | "tv";
-    season?: number;
-    episode?: number;
-    rdTorrentId?: string;
-    rdInfoHash?: string;
-    episodes?: any[];
-    videoEmbedUrl?: string;
-  }) =>
-    z.object({
-      contentId: z.string(),
-      kind: z.enum(["movie", "tv"]),
-      season: z.number().optional(),
-      episode: z.number().optional(),
-      rdTorrentId: z.string().optional(),
-      rdInfoHash: z.string().optional(),
-      episodes: z.array(z.any()).optional(),
-      videoEmbedUrl: z.string().optional(),
-    }).parse(d),
+  .validator(
+    (d: {
+      contentId: string;
+      kind: "movie" | "tv";
+      season?: number;
+      episode?: number;
+      rdTorrentId?: string;
+      rdInfoHash?: string;
+      episodes?: any[];
+      videoEmbedUrl?: string;
+    }) =>
+      z
+        .object({
+          contentId: z.string(),
+          kind: z.enum(["movie", "tv"]),
+          season: z.number().optional(),
+          episode: z.number().optional(),
+          rdTorrentId: z.string().optional(),
+          rdInfoHash: z.string().optional(),
+          episodes: z.array(z.any()).optional(),
+          videoEmbedUrl: z.string().optional(),
+        })
+        .parse(d),
   )
   .handler(async ({ data }): Promise<StreamResolution | RdResolveError> => {
-    const { contentId, kind, season, episode, rdTorrentId, rdInfoHash, episodes, videoEmbedUrl } = data;
+    const { contentId, kind, season, episode, rdTorrentId, rdInfoHash, episodes, videoEmbedUrl } =
+      data;
 
     // Get client IP for unrestrict (RD URLs are IP-locked)
     const clientIp = getClientIp();
@@ -193,7 +197,12 @@ export const resolveStream = createServerFn({ method: "POST" })
 
     // No RD torrent — try stored URL or legacy
     if (!resolvedRdTorrentId) {
-      if (kind === "tv" && season !== undefined && episode !== undefined && Array.isArray(resolvedEpisodes)) {
+      if (
+        kind === "tv" &&
+        season !== undefined &&
+        episode !== undefined &&
+        Array.isArray(resolvedEpisodes)
+      ) {
         const ep = resolvedEpisodes.find((e: any) => e.season === season && e.episode === episode);
         if (ep?.url) {
           return { stream_url: ep.url, source: "legacy" };
@@ -248,18 +257,23 @@ export const resolveStream = createServerFn({ method: "POST" })
 
 // ---- Server function: check RD account status ----
 
-export const checkRdAccountStatus = createServerFn({ method: "GET" })
-  .handler(async () => {
-    try {
-      const { checkRdStatus } = await import("./real-debrid");
-      const user = await checkRdStatus();
-      return {
-        configured: true,
-        premium: user.premium > 0,
-        expiration: user.expiration,
-        username: user.username,
-      };
-    } catch (e) {
-      return { configured: false, premium: false, expiration: null, username: null, error: String(e) };
-    }
-  });
+export const checkRdAccountStatus = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const { checkRdStatus } = await import("./real-debrid");
+    const user = await checkRdStatus();
+    return {
+      configured: true,
+      premium: user.premium > 0,
+      expiration: user.expiration,
+      username: user.username,
+    };
+  } catch (e) {
+    return {
+      configured: false,
+      premium: false,
+      expiration: null,
+      username: null,
+      error: String(e),
+    };
+  }
+});

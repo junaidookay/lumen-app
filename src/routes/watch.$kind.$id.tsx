@@ -60,11 +60,14 @@ function WatchPage() {
       if (!s) return;
       setPrefs({
         audioLanguage: s.language ?? "en",
-        subtitleLanguage: (s as unknown as { subtitle_language?: string }).subtitle_language ?? "en",
-        subtitlesEnabled: (s as unknown as { subtitles_enabled?: boolean }).subtitles_enabled ?? true,
+        subtitleLanguage:
+          (s as unknown as { subtitle_language?: string }).subtitle_language ?? "en",
+        subtitlesEnabled:
+          (s as unknown as { subtitles_enabled?: boolean }).subtitles_enabled ?? true,
         quality: s.quality ?? "auto",
         playbackSpeed: Number((s as unknown as { playback_speed?: number }).playback_speed ?? 1),
-        preferredProvider: (s as unknown as { preferred_provider?: string }).preferred_provider ?? "sample",
+        preferredProvider:
+          (s as unknown as { preferred_provider?: string }).preferred_provider ?? "sample",
       });
     });
   }, [user]);
@@ -138,7 +141,12 @@ function WatchPage() {
   useEffect(() => {
     if (isTV && resolvedSeasonNums.size > 0 && !resolvedSeasonNums.has(activeSeason)) {
       const firstAvailable = Math.min(...resolvedSeasonNums);
-      navigate({ to: "/watch/$kind/$id", params: { kind, id }, search: { season: firstAvailable, episode: 1 }, replace: true });
+      navigate({
+        to: "/watch/$kind/$id",
+        params: { kind, id },
+        search: { season: firstAvailable, episode: 1 },
+        replace: true,
+      });
     }
   }, [activeSeason, resolvedSeasonNums, isTV]);
 
@@ -148,8 +156,11 @@ function WatchPage() {
     enabled: isTV && !!seasonBase && !!item,
   });
   const season = seasonFull.data ?? seasonBase;
-  const currentEp = season?.episodes.find((e) => e.episodeNumber === search.episode) ?? season?.episodes[0];
-  const upNext = season?.episodes.find((e) => e.episodeNumber === (currentEp?.episodeNumber ?? 0) + 1);
+  const currentEp =
+    season?.episodes.find((e) => e.episodeNumber === search.episode) ?? season?.episodes[0];
+  const upNext = season?.episodes.find(
+    (e) => e.episodeNumber === (currentEp?.episodeNumber ?? 0) + 1,
+  );
 
   if (!detail || !item) {
     return (
@@ -165,7 +176,11 @@ function WatchPage() {
   const recs = detail.recommendations.slice(0, 8);
 
   const goEpisode = (n: number) =>
-    navigate({ to: "/watch/$kind/$id", params: { kind: item.kind, id: item.id }, search: { season: activeSeason, episode: n } });
+    navigate({
+      to: "/watch/$kind/$id",
+      params: { kind: item.kind, id: item.id },
+      search: { season: activeSeason, episode: n },
+    });
 
   const handlePreferenceChange = (patch: Partial<PlaybackPreferences>) => {
     setPrefs((p) => ({ ...p, ...patch }));
@@ -223,7 +238,11 @@ function WatchPage() {
         </Link>
 
         <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
             {sourcesData && sourcesData.sources.length > 0 ? (
               <VideoPlayer
                 mediaId={item.id}
@@ -231,16 +250,32 @@ function WatchPage() {
                 season={isTV ? search.season : undefined}
                 episode={isTV ? search.episode : undefined}
                 title={item.title}
-                subtitle={currentEp ? `S${currentEp.seasonNumber}E${currentEp.episodeNumber} · ${currentEp.title}` : item.tagline}
+                subtitle={
+                  currentEp
+                    ? `S${currentEp.seasonNumber}E${currentEp.episodeNumber} · ${currentEp.title}`
+                    : item.tagline
+                }
                 poster={currentEp?.still ?? item.backdrop}
                 sources={sourcesData.sources}
                 resumeSeconds={resumeSeconds}
                 preferences={prefs}
                 onPreferenceChange={handlePreferenceChange}
                 onProgress={handleProgress}
-                onPrev={currentEp && currentEp.episodeNumber > 1 ? () => goEpisode(currentEp.episodeNumber - 1) : undefined}
+                onPrev={
+                  currentEp && currentEp.episodeNumber > 1
+                    ? () => goEpisode(currentEp.episodeNumber - 1)
+                    : undefined
+                }
                 onNext={upNext ? () => goEpisode(upNext.episodeNumber) : undefined}
-                upNext={upNext ? { title: upNext.title, still: upNext.still, onPlay: () => goEpisode(upNext.episodeNumber) } : undefined}
+                upNext={
+                  upNext
+                    ? {
+                        title: upNext.title,
+                        still: upNext.still,
+                        onPlay: () => goEpisode(upNext.episodeNumber),
+                      }
+                    : undefined
+                }
               />
             ) : (
               <div className="aspect-video w-full animate-pulse rounded-3xl bg-white/5" />
@@ -251,12 +286,17 @@ function WatchPage() {
                 <h1 className="text-2xl font-semibold tracking-tight">{item.title}</h1>
                 {currentEp && (
                   <p className="text-sm text-muted-foreground">
-                    Season {currentEp.seasonNumber} · Episode {currentEp.episodeNumber} — {currentEp.title}
+                    Season {currentEp.seasonNumber} · Episode {currentEp.episodeNumber} —{" "}
+                    {currentEp.title}
                   </p>
                 )}
               </div>
               {seasons.length > 0 && (
-                <SeasonSelector seasons={seasons} activeSeason={activeSeason} onChange={setActiveSeason} />
+                <SeasonSelector
+                  seasons={seasons}
+                  activeSeason={activeSeason}
+                  onChange={setActiveSeason}
+                />
               )}
             </div>
             <p className="mt-4 text-sm leading-relaxed text-foreground/80">
@@ -273,7 +313,9 @@ function WatchPage() {
             )}
             {season && (
               <section>
-                <p className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">Episodes · Season {activeSeason}</p>
+                <p className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  Episodes · Season {activeSeason}
+                </p>
                 <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
                   {season.episodes.map((e: any, i: number) => (
                     <EpisodeCard key={e.id} episode={e} index={i} />
