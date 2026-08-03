@@ -17,10 +17,29 @@ function parseSeFromPath(path: string): { season: number; episode: number } | nu
     /[Ss](\d{1,2})[Ee](\d{1,2})/,
     /Season\s*(\d{1,2}).*Episode\s*(\d{1,2})/i,
     /(\d{1,2})x(\d{1,2})/i,
+    /[Ee]p(?:isode)?\s*(\d{1,2})/i,
+    /(\d{2,3})/,
   ];
   for (const re of patterns) {
     const m = path.match(re);
-    if (m) return { season: parseInt(m[1]), episode: parseInt(m[2]) };
+    if (m) {
+      if (re === patterns[3]) {
+        // Ep pattern: only episode number, season defaults to 1
+        return { season: 1, episode: parseInt(m[1]) };
+      }
+      if (re === patterns[4]) {
+        // Bare number: try to infer, skip if too short
+        const num = parseInt(m[1]);
+        if (num > 100) {
+          // Could be S01E01 encoded as 101
+          const s = Math.floor(num / 100);
+          const ep = num % 100;
+          if (s > 0 && ep > 0) return { season: s, episode: ep };
+        }
+        return { season: 1, episode: num };
+      }
+      return { season: parseInt(m[1]), episode: parseInt(m[2]) };
+    }
   }
   return null;
 }

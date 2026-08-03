@@ -29,6 +29,8 @@ import {
 } from "@/lib/billing/redemption.functions";
 import {
   resolveMagnetForContent,
+  resolveMagnetForSeason,
+  importTmdbSeasons,
   searchTorrentsForContent,
   autoResolveContent,
 } from "@/lib/admin/content-management.functions";
@@ -251,16 +253,74 @@ function RealDebrid() {
   const [searchType, setSearchType] = useState<"movie" | "tv">("movie");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [resolving, setResolving] = useState(false);
+  const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
+  const [seasons, setSeasons] = useState<{ number: number; hasRd: boolean; name?: string; episodeCount?: number }[]>([]);
+  const [contentKind, setContentKind] = useState<"movie" | "tv">("movie");
 
   const rdStatus = useQuery({ queryKey: ["admin", "rd-status"], queryFn: () => checkRdAccountStatus() });
 
+  // When content ID changes, fetch kind + existing seasons
+  const fetchContentInfo = async () => {
+    if (!contentId) { setSeasons([]); return; }
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: content } = await supabaseAdmin
+        .from("media_items")
+        .select("id, kind, tmdb_id")
+        .eq("id", contentId)
+        .single();
+      if (!content) return;
+      setContentKind((content.kind || "movie") as "movie" | "tv");
+
+      if (content.kind === "tv") {
+        const { data: seasonRows } = await (supabaseAdmin as any)
+          .from("media_item_seasons")
+          .select("season_number, rd_torrent_id, episodes, name")
+          .eq("media_item_id", contentId)
+          .order("season_number");
+
+        setSeasons(
+          (seasonRows ?? []).map((s: any) => ({
+            number: s.season_number,
+            hasRd: !!(s as any).rd_torrent_id,
+            name: s.name,
+            episodeCount: Array.isArray(s.episodes) ? s.episodes.length : 0,
+          }))
+        );
+      } else {
+        setSeasons([]);
+      }
+    } catch {
+      // Table may not exist yet
+    }
+  };
+
   const resolveMut = useMutation({
-    mutationFn: () => resolveMagnetForContent({ data: { contentId, magnet } }),
-    onSuccess: (res) => {
-      toast.success(`Resolved! ${res.filesCount} files, status: ${res.status}`);
+    mutationFn: async () => {
+      if (selectedSeason && contentKind === "tv") {
+        return resolveMagnetForSeason({
+          data: { mediaItemId: contentId, seasonNumber: selectedSeason, magnet }
+        });
+      }
+      return resolveMagnetForContent({ data: { contentId, magnet } });
+    },
+    onSuccess: (res: any) => {
+      toast.success(`Resolved! ${res.filesCount ?? 0} files, status: ${res.status}`);
       setMagnet("");
       setContentId("");
+      setSelectedSeason(null);
+      setSeasons([]);
       qc.invalidateQueries({ queryKey: ["admin"] });
+    },
+    onError: (e: any) => toast.error(e?.message),
+  });
+
+  const importTmdbMut = useMutation({
+    mutationFn: () => importTmdbSeasons({ data: { mediaItemId: contentId } }),
+    onSuccess: (res) => {
+      toast.success(`Imported ${res.seasonsImported} seasons, ${res.episodesImported} episodes from TMDB`);
+      qc.invalidateQueries({ queryKey: ["admin"] });
+      fetchContentInfo();
     },
     onError: (e: any) => toast.error(e?.message),
   });
@@ -309,12 +369,91 @@ function RealDebrid() {
         <h3 className="mb-3 text-sm font-medium">Resolve Magnet Link</h3>
         <p className="mb-4 text-xs text-muted-foreground">Paste a magnet link to add it to Real Debrid and link it to a content item.</p>
         <div className="space-y-3">
-          <Input placeholder="Content ID (UUID)" value={contentId} onChange={(e) => setContentId(e.target.value)} />
+          <div className="flex gap-2">
+            <Input
+              placeholder="Content ID (UUID)"
+              value={contentId}
+              onChange={(e) => setContentId(e.target.value)}
+              onBlur={() => fetchContentInfo()}
+            />
+            {contentId && contentKind === "tv" && (
+              <Button variant="outline" size="sm" onClick={() => fetchContentInfo()} className="flex-shrink-0">
+                Load seasons
+              </Button>
+            )}
+          </div>
+
+          {/* Season selector for TV */}
+          {contentKind === "tv" && seasons.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-xs text-muted-foreground">Save to season (optional)</label>
+              <select
+                className="w-full h-9 px-3 rounded-lg bg-white/[0.03] border border-hairline text-sm"
+                value={selectedSeason ?? ""}
+                onChange={(e) => setSelectedSeason(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">All seasons (title-level)</option>
+                {seasons.map((s) => (
+                  <option key={s.number} value={s.number}>
+                    Season {s.number}{s.name ? ` — ${s.name}` : ""}{s.hasRd ? " ✓ RD linked" : ""}{s.episodeCount ? ` (${s.episodeCount} eps)` : ""}
+                  </option>
+                ))}
+              </select>
+              {selectedSeason && (
+                <p className="text-xs text-muted-foreground">
+                  Magnet will be saved to Season {selectedSeason} only.
+                </p>
+              )}
+              {!selectedSeason && (
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to save to title level (covers all seasons from one magnet).
+                </p>
+              )}
+            </div>
+          )}
+
           <Textarea placeholder="magnet:?xt=urn:btih:..." value={magnet} onChange={(e) => setMagnet(e.target.value)} rows={3} />
-          <Button onClick={() => resolveMut.mutate()} disabled={resolving || !magnet || !contentId} className="rounded-full">
-            {resolveMut.isPending ? "Resolving..." : "Resolve & Link"}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => resolveMut.mutate()} disabled={resolveMut.isPending || !magnet || !contentId} className="rounded-full">
+              {resolveMut.isPending ? "Resolving..." : selectedSeason ? `Resolve & Link S${selectedSeason}` : "Resolve & Link"}
+            </Button>
+            {contentKind === "tv" && contentId && (
+              <Button variant="outline" onClick={() => importTmdbMut.mutate()} disabled={importTmdbMut.isPending} className="rounded-full">
+                {importTmdbMut.isPending ? "Importing..." : "Import TMDB Seasons"}
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Season status table */}
+        {contentKind === "tv" && seasons.length > 0 && (
+          <div className="mt-4 overflow-x-auto rounded-xl border border-white/5">
+            <table className="w-full text-sm">
+              <thead className="bg-white/5 text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left">Season</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-left">Episodes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {seasons.map((s) => (
+                  <tr key={s.number} className="border-t border-white/5">
+                    <td className="px-3 py-2">S{s.number}{s.name ? ` — ${s.name}` : ""}</td>
+                    <td className="px-3 py-2">
+                      {s.hasRd ? (
+                        <span className="text-emerald-300 text-xs">✓ RD linked</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">No magnet</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground text-xs">{s.episodeCount ?? 0} eps</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Torrent Search */}

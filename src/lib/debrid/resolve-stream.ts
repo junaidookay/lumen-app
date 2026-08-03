@@ -51,6 +51,41 @@ async function readdTorrent(infoHash: string): Promise<{ torrentId?: string; err
   }
 }
 
+/**
+ * Try transcoding with multiple candidates in parallel.
+ * Returns the first successful transcoded URL.
+ */
+async function tryParallelTranscode(
+  restrictedLink: string,
+  unrestrictedDownload: string,
+  unrestrictId: string,
+): Promise<string | null> {
+  const { findDownloadId, getTranscodedUrl } = await import("./real-debrid");
+
+  // Build candidate IDs: unrestrict ID, short code from restricted link, download URL segment
+  const candidates = [unrestrictId];
+  const shortCode = restrictedLink.match(/\/d\/([A-Z0-9]+)/)?.[1];
+  if (shortCode && shortCode !== unrestrictId) candidates.push(shortCode);
+  const dlSegment = unrestrictedDownload?.match(/\/d\/([A-Z0-9]+)/)?.[1];
+  if (dlSegment && !candidates.includes(dlSegment)) candidates.push(dlSegment);
+
+  // Try download ID lookup + transcode for each candidate in parallel
+  const results = await Promise.allSettled(
+    candidates.map(async (cid) => {
+      const downloadId = await findDownloadId(restrictedLink);
+      if (!downloadId) throw new Error("no download match");
+      const url = await getTranscodedUrl(downloadId);
+      if (!url) throw new Error("no transcode url");
+      return url;
+    })
+  );
+
+  for (const r of results) {
+    if (r.status === "fulfilled") return r.value;
+  }
+  return null;
+}
+
 async function resolveFromTorrentInfo(
   torrentInfo: any,
   content: any,
@@ -85,19 +120,17 @@ async function resolveFromTorrentInfo(
   const unrestricted = await unrestrictLink(restrictedLink, clientIp);
   const directUrl = unrestricted.download;
 
-  // Try transcoding for browser-compatible streams
-  // IMPORTANT: The unrestrict ID does NOT work with /streaming/transcode.
-  // We must look up the download ID from /downloads list instead.
+  // Skip transcode for H.264 MP4 — direct download is faster
+  const filename = torrentInfo.files?.[linkIndex]?.path ?? torrentInfo.files?.[linkIndex]?.name ?? "";
+  const isH264Mp4 = /(\.mp4|\.m4v)/.test(filename) && /(x264|h264|avc|bluray)/i.test(filename);
+  if (isH264Mp4) {
+    return { stream_url: directUrl };
+  }
+
+  // Try transcoding for browser-compatible streams (parallel candidates)
   if (unrestricted.streamable === 1) {
-    try {
-      const downloadId = await findDownloadId(restrictedLink);
-      if (downloadId) {
-        const transcoded = await getTranscodedUrl(downloadId);
-        if (transcoded) return { stream_url: transcoded };
-      }
-    } catch {
-      // Transcode unavailable — fall back to direct URL
-    }
+    const transcoded = await tryParallelTranscode(restrictedLink, directUrl, unrestricted.id);
+    if (transcoded) return { stream_url: transcoded };
   }
 
   return { stream_url: directUrl };
@@ -133,10 +166,35 @@ export const resolveStream = createServerFn({ method: "POST" })
     // Get client IP for unrestrict (RD URLs are IP-locked)
     const clientIp = getClientIp();
 
+    // Determine RD source: season-level first, then title-level
+    let resolvedRdTorrentId = rdTorrentId;
+    let resolvedRdInfoHash = rdInfoHash;
+    let resolvedEpisodes = episodes;
+
+    if (kind === "tv" && season != null) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: seasonRow } = await (supabaseAdmin as any)
+          .from("media_item_seasons")
+          .select("rd_torrent_id, rd_info_hash, episodes")
+          .eq("media_item_id", contentId)
+          .eq("season_number", season)
+          .single();
+
+        if (seasonRow?.rd_torrent_id) {
+          resolvedRdTorrentId = seasonRow.rd_torrent_id;
+          resolvedRdInfoHash = seasonRow.rd_info_hash;
+          resolvedEpisodes = seasonRow.episodes ?? [];
+        }
+      } catch {
+        // Season table may not exist yet or no row — fall through to title-level
+      }
+    }
+
     // No RD torrent — try stored URL or legacy
-    if (!rdTorrentId) {
-      if (kind === "tv" && season !== undefined && episode !== undefined && Array.isArray(episodes)) {
-        const ep = episodes.find((e: any) => e.season === season && e.episode === episode);
+    if (!resolvedRdTorrentId) {
+      if (kind === "tv" && season !== undefined && episode !== undefined && Array.isArray(resolvedEpisodes)) {
+        const ep = resolvedEpisodes.find((e: any) => e.season === season && e.episode === episode);
         if (ep?.url) {
           return { stream_url: ep.url, source: "legacy" };
         }
@@ -150,11 +208,11 @@ export const resolveStream = createServerFn({ method: "POST" })
     // Dynamic RD resolution
     let torrentInfo: any;
     try {
-      torrentInfo = await getTorrentInfo(rdTorrentId);
+      torrentInfo = await getTorrentInfo(resolvedRdTorrentId);
     } catch {
       // Torrent might have expired — try re-adding from hash
-      if (rdInfoHash) {
-        const readd = await readdTorrent(rdInfoHash);
+      if (resolvedRdInfoHash) {
+        const readd = await readdTorrent(resolvedRdInfoHash);
         if (readd.error) return { error: readd.error, retryable: true };
         try {
           torrentInfo = await getTorrentInfo(readd.torrentId!);
@@ -168,13 +226,13 @@ export const resolveStream = createServerFn({ method: "POST" })
 
     // Auto-build TV episodes if not already built
     let builtEpisodes: any[] | undefined;
-    if (kind === "tv" && (!Array.isArray(episodes) || episodes.length === 0)) {
+    if (kind === "tv" && (!Array.isArray(resolvedEpisodes) || resolvedEpisodes.length === 0)) {
       builtEpisodes = buildTvEpisodesFromTorrentInfo(torrentInfo);
     }
 
     const result = await resolveFromTorrentInfo(
       torrentInfo,
-      { kind, episodes: builtEpisodes || episodes },
+      { kind, episodes: builtEpisodes || resolvedEpisodes },
       season,
       episode,
       clientIp,

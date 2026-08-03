@@ -18,8 +18,28 @@ async function resolveRdSources(req: StreamRequest): Promise<StreamingSource[]> 
 
     if (!content) return [];
 
+    // Check season-level RD data first (for per-season magnets)
+    let rdTorrentId = content.rd_torrent_id;
+    let rdInfoHash = content.rd_info_hash;
+    let episodes = (content.episodes as any[]) ?? undefined;
+
+    if (content.kind === "tv" && req.season != null) {
+      const { data: seasonRow } = await (supabaseAdmin as any)
+        .from("media_item_seasons")
+        .select("rd_torrent_id, rd_info_hash, episodes")
+        .eq("media_item_id", req.mediaId)
+        .eq("season_number", req.season)
+        .single();
+
+      if (seasonRow?.rd_torrent_id) {
+        rdTorrentId = seasonRow.rd_torrent_id;
+        rdInfoHash = seasonRow.rd_info_hash;
+        episodes = seasonRow.episodes ?? [];
+      }
+    }
+
     // If no RD torrent and no stored URL, return empty
-    if (!content.rd_torrent_id && !content.video_url) return [];
+    if (!rdTorrentId && !content.video_url) return [];
 
     // Resolve via RD
     const result = await resolveStream({
@@ -28,9 +48,9 @@ async function resolveRdSources(req: StreamRequest): Promise<StreamingSource[]> 
         kind: (content.kind || req.kind) as "movie" | "tv",
         season: req.season,
         episode: req.episode,
-        rdTorrentId: content.rd_torrent_id ?? undefined,
-        rdInfoHash: content.rd_info_hash ?? undefined,
-        episodes: (content.episodes as any[]) ?? undefined,
+        rdTorrentId: rdTorrentId ?? undefined,
+        rdInfoHash: rdInfoHash ?? undefined,
+        episodes,
         videoEmbedUrl: content.video_url ?? undefined,
       },
     });

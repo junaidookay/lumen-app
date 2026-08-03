@@ -25,6 +25,42 @@ function rdHeaders(): Record<string, string> {
   };
 }
 
+// ---- In-memory cache for unrestricted URLs ──────────────────────────
+// RD unrestricted URLs are IP-locked and valid for hours. Cache them
+// keyed by restricted link + client IP so replays are instant.
+
+const unrestrictedCache = new Map<string, { id: string; download: string; at: number }>();
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+function cacheKey(link: string, ip?: string): string {
+  return `${link}:${ip ?? "unknown"}`;
+}
+
+function getCachedUnrestrict(link: string, ip?: string) {
+  const key = cacheKey(link, ip);
+  const entry = unrestrictedCache.get(key);
+  if (entry && Date.now() - entry.at < CACHE_TTL_MS) return entry;
+  unrestrictedCache.delete(key);
+  return null;
+}
+
+function setCachedUnrestrict(link: string, ip: string | undefined, data: { id: string; download: string }) {
+  const key = cacheKey(link, ip);
+  if (unrestrictedCache.size > 100) {
+    const now = Date.now();
+    for (const [k, v] of unrestrictedCache) {
+      if (now - v.at > CACHE_TTL_MS) unrestrictedCache.delete(k);
+    }
+  }
+  unrestrictedCache.set(key, { id: data.id, download: data.download, at: Date.now() });
+}
+
+// ---- Downloads list cache ───────────────────────────────────────────
+// /downloads is called on every transcode attempt — cache for 5 min.
+
+let downloadsCache: { data: any[]; at: number } | null = null;
+const DOWNLOADS_CACHE_TTL_MS = 5 * 60 * 1000;
+
 // ---- Safe fetch helper (handles empty bodies) ----
 
 async function rdFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -82,13 +118,19 @@ export async function unrestrictLink(
   link: string,
   clientIp?: string,
 ): Promise<RdUnrestrictedLink> {
+  const cached = getCachedUnrestrict(link, clientIp);
+  if (cached) {
+    return { id: cached.id, download: cached.download, filename: "", mimeType: "", filesize: 0, link, host: "", chunks: 0, streamable: 1 };
+  }
   const body = new URLSearchParams({ link });
   if (clientIp) body.set("ip", clientIp);
-  return rdFetch<RdUnrestrictedLink>("/unrestrict/link", {
+  const result = await rdFetch<RdUnrestrictedLink>("/unrestrict/link", {
     method: "POST",
     headers: rdHeaders(),
     body: body.toString(),
   });
+  setCachedUnrestrict(link, clientIp, result);
+  return result;
 }
 
 /**
@@ -121,9 +163,14 @@ export async function addMagnetAndWait(
  * the download ID from THIS list — the unrestrict/link ID does NOT work.
  */
 export async function getDownloadsList(limit = 500): Promise<any[]> {
-  return rdFetch<any[]>(`/downloads?limit=${limit}`, {
+  if (downloadsCache && Date.now() - downloadsCache.at < DOWNLOADS_CACHE_TTL_MS) {
+    return downloadsCache.data;
+  }
+  const data = await rdFetch<any[]>(`/downloads?limit=${limit}`, {
     headers: { Authorization: `Bearer ${getApiKey()}` },
   });
+  downloadsCache = { data, at: Date.now() };
+  return data;
 }
 
 /**

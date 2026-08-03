@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/AppShell";
@@ -32,9 +32,45 @@ function TVDetail() {
   const recs = data.recommendations;
   const [activeSeason, setActiveSeason] = useState(1);
   const seasons = show.seasons ?? [];
-  const seasonNumber = seasons.find((s) => s.seasonNumber === activeSeason)?.seasonNumber ?? seasons[0]?.seasonNumber ?? 1;
+
+  // Check which seasons have RD data
+  const { data: resolvedSeasonRows } = useQuery({
+    queryKey: ["resolved-seasons", id],
+    queryFn: async () => {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await (supabaseAdmin as any)
+        .from("media_item_seasons")
+        .select("season_number")
+        .eq("media_item_id", id);
+      return data ?? [];
+    },
+  });
+
+  const resolvedSeasonNums = useMemo(() => {
+    const nums = new Set<number>(resolvedSeasonRows?.map((s: any) => s.season_number) ?? []);
+    // Also check title-level episodes (from raw DB, not mapped MediaItem)
+    const rawItem = show as any;
+    if (rawItem.episodes) {
+      for (const ep of rawItem.episodes as any[]) nums.add(ep.season);
+    }
+    // Check if media_item has rd_torrent_id (title-level magnet covers all seasons in episodes)
+    return nums;
+  }, [resolvedSeasonRows, (show as any).episodes]);
+
+  // Filter seasons: show only resolved ones if any exist, otherwise show all
+  const visibleSeasons = useMemo(() => {
+    if (resolvedSeasonNums.size === 0) return seasons;
+    return seasons.filter((s) => resolvedSeasonNums.has(s.seasonNumber));
+  }, [seasons, resolvedSeasonNums]);
+
+  // Auto-correct active season
+  if (visibleSeasons.length > 0 && !visibleSeasons.find((s) => s.seasonNumber === activeSeason)) {
+    setActiveSeason(visibleSeasons[0].seasonNumber);
+  }
+
+  const seasonNumber = visibleSeasons.find((s) => s.seasonNumber === activeSeason)?.seasonNumber ?? visibleSeasons[0]?.seasonNumber ?? 1;
   const seasonDetail = useQuery(seasonQuery(show.id, seasonNumber));
-  const season = seasonDetail.data ?? seasons.find((s) => s.seasonNumber === seasonNumber);
+  const season = seasonDetail.data ?? visibleSeasons.find((s) => s.seasonNumber === seasonNumber);
 
   return (
     <AppShell>
@@ -50,13 +86,19 @@ function TVDetail() {
           </section>
         )}
 
-        {seasons.length > 0 && season && (
+        {visibleSeasons.length > 0 && season && (
           <section>
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-2xl font-semibold tracking-tight">Episodes</h2>
-              <SeasonSelector seasons={seasons} activeSeason={activeSeason} onChange={setActiveSeason} />
+              <SeasonSelector seasons={visibleSeasons} activeSeason={activeSeason} onChange={setActiveSeason} />
             </div>
             <EpisodeList episodes={season.episodes} keyId={`${show.id}-s${activeSeason}`} />
+          </section>
+        )}
+
+        {visibleSeasons.length === 0 && (
+          <section className="text-center py-16">
+            <p className="text-muted-foreground">No episodes available yet. Content is being processed.</p>
           </section>
         )}
 

@@ -109,6 +109,39 @@ function WatchPage() {
   const item = detail?.item;
   const seasons = item?.seasons ?? [];
   const [activeSeason, setActiveSeason] = useState(search.season);
+
+  // Check resolved seasons for auto-redirect
+  const { data: resolvedSeasonRows } = useQuery({
+    queryKey: ["resolved-seasons", id],
+    queryFn: async () => {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data } = await (supabaseAdmin as any)
+        .from("media_item_seasons")
+        .select("season_number")
+        .eq("media_item_id", id);
+      return data ?? [];
+    },
+    enabled: isTV,
+  });
+
+  const resolvedSeasonNums = useMemo(() => {
+    const nums = new Set<number>(resolvedSeasonRows?.map((s: any) => s.season_number) ?? []);
+    // Also check title-level episodes (from raw DB, not mapped MediaItem)
+    const rawItem = item as any;
+    if (rawItem.episodes) {
+      for (const ep of rawItem.episodes as any[]) nums.add(ep.season);
+    }
+    return nums;
+  }, [resolvedSeasonRows, (item as any)?.episodes]);
+
+  // Auto-redirect to first available season if current season has no data
+  useEffect(() => {
+    if (isTV && resolvedSeasonNums.size > 0 && !resolvedSeasonNums.has(activeSeason)) {
+      const firstAvailable = Math.min(...resolvedSeasonNums);
+      navigate({ to: "/watch/$kind/$id", params: { kind, id }, search: { season: firstAvailable, episode: 1 }, replace: true });
+    }
+  }, [activeSeason, resolvedSeasonNums, isTV]);
+
   const seasonBase = seasons.find((s) => s.seasonNumber === activeSeason) ?? seasons[0];
   const seasonFull = useQuery({
     ...seasonQuery(item?.id ?? "", seasonBase?.seasonNumber ?? 1),
