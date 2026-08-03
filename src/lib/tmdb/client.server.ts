@@ -39,10 +39,24 @@ function chooseTTL(path: string): number {
   return 60 * 60 * 1000; // 1h default
 }
 
-function readToken(): string {
+async function readToken(): Promise<string> {
+  // Check settings table first, fall back to env var
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await (supabaseAdmin as any)
+      .from("settings")
+      .select("value")
+      .eq("key", "tmdb_api_key")
+      .maybeSingle();
+    if (data?.value) return data.value;
+  } catch {
+    // Settings table not available yet — fall through to env var
+  }
   const token = process.env.TMDB_ACCESS_TOKEN;
   if (!token) {
-    const err = new Error("TMDB_ACCESS_TOKEN is not configured on the server.") as TMDBError;
+    const err = new Error(
+      "TMDB API key not configured. Set it in Admin → Settings or via TMDB_ACCESS_TOKEN env var.",
+    ) as TMDBError;
     err.status = 500;
     throw err;
   }
@@ -79,7 +93,7 @@ export async function tmdbFetch<T>(path: string, opts: TMDBFetchOptions = {}): P
   }
   const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
 
-  const token = readToken();
+  const token = await readToken();
   const promise = (async () => {
     const res = await fetch(fullUrl, {
       headers: {
@@ -90,7 +104,9 @@ export async function tmdbFetch<T>(path: string, opts: TMDBFetchOptions = {}): P
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      const err = new Error(`TMDB ${res.status} ${res.statusText}: ${body.slice(0, 200)}`) as TMDBError;
+      const err = new Error(
+        `TMDB ${res.status} ${res.statusText}: ${body.slice(0, 200)}`,
+      ) as TMDBError;
       err.status = res.status;
       throw err;
     }
