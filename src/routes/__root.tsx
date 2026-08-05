@@ -138,17 +138,19 @@ function RootComponent() {
     // Manual registration removed — was causing 404 with TanStack Start + Nitro
   }, []);
 
-  useInstallDetection();
-
   return (
     <QueryClientProvider client={queryClient}>
       <MotionProvider>
         <AuthProvider>
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
+          <RootInner />
           <Toaster />
         </AuthProvider>
       </MotionProvider>
     </QueryClientProvider>
   );
+}
+
+function RootInner() {
+  useInstallDetection();
+  return <Outlet />;
 }
