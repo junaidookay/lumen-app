@@ -17,6 +17,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { registerSW } from "@/pwa/services/sw-register";
 import { MotionProvider } from "@/components/motion-provider";
 import { useInstallDetection } from "@/pwa/hooks/use-install-detection";
+import { useBranding } from "@/hooks/use-branding";
 
 function NotFoundComponent() {
   return (
@@ -152,5 +153,26 @@ function RootComponent() {
 
 function RootInner() {
   useInstallDetection();
+  const branding = useBranding();
+
+  // Dynamically update favicon from settings
+  useEffect(() => {
+    if (!branding?.faviconUrl) return;
+    let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.href = branding.faviconUrl;
+  }, [branding?.faviconUrl]);
+
+  // Dynamically update page title from settings
+  useEffect(() => {
+    if (branding?.name) {
+      document.title = `${branding.name} — ${branding.tagline || SITE.tagline}`;
+    }
+  }, [branding?.name, branding?.tagline]);
+
   return <Outlet />;
 }
