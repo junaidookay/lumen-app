@@ -61,7 +61,7 @@ import {
 } from "@/lib/admin/content-management.functions";
 import { checkRdAccountStatus } from "@/lib/debrid/resolve-stream";
 import { AD_SLOT_LABELS, AD_PROVIDERS } from "@/lib/ads/registry";
-import { listSettings, upsertSetting } from "@/lib/admin/settings.functions";
+import { listSettings, upsertSetting, uploadSettingFile } from "@/lib/admin/settings.functions";
 import { searchTmdbTitles, batchImportTmdbTitles } from "@/lib/tmdb/tmdb-import.server";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -1495,88 +1495,188 @@ function SettingsTab() {
       qc.invalidateQueries({ queryKey: ["branding"] });
     },
   });
+  const uploadMut = useMutation({
+    mutationFn: (vars: { fileName: string; fileBase64: string; contentType: string }) =>
+      uploadSettingFile({ data: vars }),
+    onSuccess: (res) => {
+      toast.success("File uploaded");
+      return res.url;
+    },
+    onError: (e: any) => toast.error(e?.message),
+  });
 
   const [form, setForm] = useState<Record<string, string>>({});
-
-  const BUILTIN_SETTINGS = [
-    {
-      key: "app_name",
-      label: "App Name",
-      description: "Display name shown in the navbar, PWA manifest, and browser tab.",
-      placeholder: "Lumen",
-    },
-    {
-      key: "app_tagline",
-      label: "Tagline",
-      description: "Short tagline shown under the app name.",
-      placeholder: "Cinema, streamed.",
-    },
-    {
-      key: "app_logo_url",
-      label: "Logo URL",
-      description: "URL to a logo image. Leave empty to use the default gradient letter.",
-      placeholder: "https://example.com/logo.png",
-    },
-    {
-      key: "tmdb_api_key",
-      label: "TMDB API Key",
-      description: "v4 Read Access Token for importing titles from The Movie Database.",
-      placeholder: "eyJhbGciOiJIUzI1NiJ9...",
-    },
-    {
-      key: "telegram_url",
-      label: "Telegram Channel URL",
-      description: "Link shown on the floating Telegram button.",
-      placeholder: "https://t.me/yourchannel",
-    },
-    {
-      key: "whatsapp_url",
-      label: "WhatsApp Channel URL",
-      description: "Link shown on the floating WhatsApp button.",
-      placeholder: "https://chat.whatsapp.com/...",
-    },
-  ];
 
   const getVal = (key: string) =>
     form[key] ?? settings?.find((s: any) => s.key === key)?.value ?? "";
 
+  const handleFileUpload = async (key: string, file: File) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(",")[1];
+      try {
+        const res = await uploadMut.mutateAsync({ fileName: file.name, fileBase64: base64, contentType: file.type });
+        setForm((f) => ({ ...f, [key]: res.url }));
+        await upsertMut.mutateAsync({ key, value: res.url, description: `Uploaded ${file.name}` });
+      } catch {}
+    };
+    reader.readAsDataURL(file);
+  };
+
   if (isLoading) return <div className="text-sm text-muted-foreground py-8">Loading settings…</div>;
 
   return (
-    <div className="space-y-6">
-      <p className="text-xs uppercase tracking-[0.25em] text-brand">Platform Configuration</p>
-      <h2 className="text-xl font-semibold">Settings</h2>
-      {BUILTIN_SETTINGS.map((s) => (
-        <div key={s.key} className="rounded-2xl border border-white/5 glass p-5 space-y-3">
-          <div>
-            <p className="text-sm font-medium">{s.label}</p>
-            <p className="text-xs text-muted-foreground">{s.description}</p>
-          </div>
-          <div className="flex gap-3">
-            <Input
-              type={s.key.includes("key") || s.key.includes("secret") ? "password" : "text"}
-              placeholder={s.placeholder}
-              value={getVal(s.key)}
-              onChange={(e) => setForm((f) => ({ ...f, [s.key]: e.target.value }))}
-              className="flex-1"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                upsertMut.mutate({ key: s.key, value: getVal(s.key), description: s.description })
-              }
-              disabled={upsertMut.isPending || !getVal(s.key)}
-            >
-              Save
-            </Button>
-          </div>
+    <div className="space-y-8">
+      <div>
+        <p className="text-xs uppercase tracking-[0.25em] text-brand">Branding</p>
+        <h2 className="text-xl font-semibold">Appearance</h2>
+      </div>
+
+      {/* App Name */}
+      <div className="rounded-2xl border border-white/5 glass p-5 space-y-3">
+        <div>
+          <p className="text-sm font-medium">App Name</p>
+          <p className="text-xs text-muted-foreground">Display name shown in the navbar, PWA manifest, and browser tab.</p>
         </div>
-      ))}
-      <p className="text-xs text-muted-foreground">
-        You can also set <code className="bg-white/5 px-1.5 py-0.5 rounded">TMDB_ACCESS_TOKEN</code>{" "}
-        as an environment variable as a fallback.
-      </p>
+        <div className="flex gap-3">
+          <Input placeholder="Lumen" value={getVal("app_name")} onChange={(e) => setForm((f) => ({ ...f, app_name: e.target.value }))} className="flex-1" />
+          <Button variant="outline" size="sm" onClick={() => upsertMut.mutate({ key: "app_name", value: getVal("app_name") })} disabled={upsertMut.isPending || !getVal("app_name")}>Save</Button>
+        </div>
+      </div>
+
+      {/* Logo */}
+      <div className="rounded-2xl border border-white/5 glass p-5 space-y-3">
+        <div>
+          <p className="text-sm font-medium">Logo</p>
+          <p className="text-xs text-muted-foreground">Upload a logo image or paste a URL. This replaces the default gradient letter in the navbar.</p>
+        </div>
+        {getVal("app_logo_url") && (
+          <div className="flex items-center gap-3">
+            <img src={getVal("app_logo_url")} alt="Logo preview" className="h-12 w-12 rounded-xl object-contain bg-white/5" />
+            <Button variant="ghost" size="sm" onClick={() => { setForm((f) => ({ ...f, app_logo_url: "" })); upsertMut.mutate({ key: "app_logo_url", value: "" }); }}>Remove</Button>
+          </div>
+        )}
+        <div className="flex gap-3">
+          <Input placeholder="https://example.com/logo.png" value={getVal("app_logo_url")} onChange={(e) => setForm((f) => ({ ...f, app_logo_url: e.target.value }))} className="flex-1" />
+          <Button variant="outline" size="sm" onClick={() => upsertMut.mutate({ key: "app_logo_url", value: getVal("app_logo_url") })} disabled={upsertMut.isPending || !getVal("app_logo_url")}>Save URL</Button>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="h-9 px-4 rounded-full border border-white/10 bg-white/5 text-sm flex items-center gap-2 cursor-pointer hover:bg-white/10 transition">
+            <span>Upload file</span>
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload("app_logo_url", e.target.files[0])} />
+          </label>
+          <span className="text-xs text-muted-foreground">PNG, SVG, or JPG</span>
+        </div>
+      </div>
+
+      {/* Favicon */}
+      <div className="rounded-2xl border border-white/5 glass p-5 space-y-3">
+        <div>
+          <p className="text-sm font-medium">Favicon</p>
+          <p className="text-xs text-muted-foreground">Small icon shown in browser tabs. Recommended: 32x32 or 64x64 PNG.</p>
+        </div>
+        {getVal("app_favicon_url") && (
+          <div className="flex items-center gap-3">
+            <img src={getVal("app_favicon_url")} alt="Favicon preview" className="h-8 w-8 rounded object-contain bg-white/5" />
+            <Button variant="ghost" size="sm" onClick={() => { setForm((f) => ({ ...f, app_favicon_url: "" })); upsertMut.mutate({ key: "app_favicon_url", value: "" }); }}>Remove</Button>
+          </div>
+        )}
+        <div className="flex gap-3">
+          <Input placeholder="https://example.com/favicon.png" value={getVal("app_favicon_url")} onChange={(e) => setForm((f) => ({ ...f, app_favicon_url: e.target.value }))} className="flex-1" />
+          <Button variant="outline" size="sm" onClick={() => upsertMut.mutate({ key: "app_favicon_url", value: getVal("app_favicon_url") })} disabled={upsertMut.isPending || !getVal("app_favicon_url")}>Save URL</Button>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="h-9 px-4 rounded-full border border-white/10 bg-white/5 text-sm flex items-center gap-2 cursor-pointer hover:bg-white/10 transition">
+            <span>Upload file</span>
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload("app_favicon_url", e.target.files[0])} />
+          </label>
+          <span className="text-xs text-muted-foreground">PNG or ICO</span>
+        </div>
+      </div>
+
+      {/* Logo Display Mode */}
+      <div className="rounded-2xl border border-white/5 glass p-5 space-y-3">
+        <div>
+          <p className="text-sm font-medium">Logo Display</p>
+          <p className="text-xs text-muted-foreground">Choose how the logo appears in the navbar.</p>
+        </div>
+        <div className="flex gap-2">
+          {[
+            { value: "both", label: "Logo + Title", desc: "Icon image before the site name text" },
+            { value: "logo_only", label: "Logo Only", desc: "Just the icon, no text" },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => { setForm((f) => ({ ...f, app_logo_display: opt.value })); upsertMut.mutate({ key: "app_logo_display", value: opt.value }); }}
+              className={`flex-1 rounded-xl border p-3 text-left text-sm transition ${getVal("app_logo_display") === opt.value ? "border-brand bg-brand/10" : "border-white/10 hover:bg-white/5"}`}
+            >
+              <p className="font-medium">{opt.label}</p>
+              <p className="text-xs text-muted-foreground mt-1">{opt.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tagline */}
+      <div className="rounded-2xl border border-white/5 glass p-5 space-y-3">
+        <div>
+          <p className="text-sm font-medium">Tagline</p>
+          <p className="text-xs text-muted-foreground">Short tagline shown under the app name.</p>
+        </div>
+        <div className="flex gap-3">
+          <Input placeholder="Cinema, streamed." value={getVal("app_tagline")} onChange={(e) => setForm((f) => ({ ...f, app_tagline: e.target.value }))} className="flex-1" />
+          <Button variant="outline" size="sm" onClick={() => upsertMut.mutate({ key: "app_tagline", value: getVal("app_tagline") })} disabled={upsertMut.isPending || !getVal("app_tagline")}>Save</Button>
+        </div>
+      </div>
+
+      <div className="border-t border-white/5 pt-6">
+        <p className="text-xs uppercase tracking-[0.25em] text-brand">API Keys</p>
+        <h2 className="text-xl font-semibold mt-2">Integrations</h2>
+      </div>
+
+      {/* TMDB API Key */}
+      <div className="rounded-2xl border border-white/5 glass p-5 space-y-3">
+        <div>
+          <p className="text-sm font-medium">TMDB API Key</p>
+          <p className="text-xs text-muted-foreground">v4 Read Access Token for importing titles from The Movie Database.</p>
+        </div>
+        <div className="flex gap-3">
+          <Input type="password" placeholder="eyJhbGciOiJIUzI1NiJ9..." value={getVal("tmdb_api_key")} onChange={(e) => setForm((f) => ({ ...f, tmdb_api_key: e.target.value }))} className="flex-1" />
+          <Button variant="outline" size="sm" onClick={() => upsertMut.mutate({ key: "tmdb_api_key", value: getVal("tmdb_api_key") })} disabled={upsertMut.isPending || !getVal("tmdb_api_key")}>Save</Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          You can also set <code className="bg-white/5 px-1.5 py-0.5 rounded">TMDB_ACCESS_TOKEN</code> as an environment variable as a fallback.
+        </p>
+      </div>
+
+      <div className="border-t border-white/5 pt-6">
+        <p className="text-xs uppercase tracking-[0.25em] text-brand">Support</p>
+        <h2 className="text-xl font-semibold mt-2">Community Channels</h2>
+      </div>
+
+      {/* Telegram */}
+      <div className="rounded-2xl border border-white/5 glass p-5 space-y-3">
+        <div>
+          <p className="text-sm font-medium">Telegram Channel URL</p>
+          <p className="text-xs text-muted-foreground">Link shown on the floating Telegram button.</p>
+        </div>
+        <div className="flex gap-3">
+          <Input placeholder="https://t.me/yourchannel" value={getVal("telegram_url")} onChange={(e) => setForm((f) => ({ ...f, telegram_url: e.target.value }))} className="flex-1" />
+          <Button variant="outline" size="sm" onClick={() => upsertMut.mutate({ key: "telegram_url", value: getVal("telegram_url") })} disabled={upsertMut.isPending || !getVal("telegram_url")}>Save</Button>
+        </div>
+      </div>
+
+      {/* WhatsApp */}
+      <div className="rounded-2xl border border-white/5 glass p-5 space-y-3">
+        <div>
+          <p className="text-sm font-medium">WhatsApp Channel URL</p>
+          <p className="text-xs text-muted-foreground">Link shown on the floating WhatsApp button.</p>
+        </div>
+        <div className="flex gap-3">
+          <Input placeholder="https://chat.whatsapp.com/..." value={getVal("whatsapp_url")} onChange={(e) => setForm((f) => ({ ...f, whatsapp_url: e.target.value }))} className="flex-1" />
+          <Button variant="outline" size="sm" onClick={() => upsertMut.mutate({ key: "whatsapp_url", value: getVal("whatsapp_url") })} disabled={upsertMut.isPending || !getVal("whatsapp_url")}>Save</Button>
+        </div>
+      </div>
     </div>
   );
 }

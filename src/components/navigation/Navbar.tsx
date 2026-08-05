@@ -16,6 +16,7 @@ export function Navbar() {
   // Start with static defaults to avoid hydration mismatch, then update from DB
   const [appName, setAppName] = useState<string>(SITE.name);
   const [logoUrl, setLogoUrl] = useState<string>("");
+  const [logoDisplay, setLogoDisplay] = useState<string>("both");
 
   const { data: branding } = useQuery({
     queryKey: ["branding"],
@@ -28,6 +29,7 @@ export function Navbar() {
     if (branding) {
       if (branding.name) setAppName(branding.name);
       if (branding.logoUrl) setLogoUrl(branding.logoUrl);
+      if (branding.logoDisplay) setLogoDisplay(branding.logoDisplay);
     }
   }, [branding]);
 
@@ -62,7 +64,9 @@ export function Navbar() {
                 <span className="text-lg font-bold leading-none text-white">{appName.charAt(0)}</span>
               </span>
             )}
-            <span className="text-lg font-semibold tracking-tight">{appName}</span>
+            {logoDisplay !== "logo_only" && (
+              <span className="text-lg font-semibold tracking-tight">{appName}</span>
+            )}
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">

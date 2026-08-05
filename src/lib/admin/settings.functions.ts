@@ -92,17 +92,51 @@ export const getBranding = createServerFn({ method: "GET" }).handler(async () =>
     const { data } = await (supabaseAdmin as any)
       .from("settings")
       .select("key, value")
-      .in("key", ["app_name", "app_tagline", "app_logo_url", "telegram_url", "whatsapp_url"]);
+      .in("key", ["app_name", "app_tagline", "app_logo_url", "app_favicon_url", "app_logo_display", "telegram_url", "whatsapp_url"]);
     const map: Record<string, string> = {};
     for (const row of data ?? []) map[row.key] = row.value;
     return {
       name: map.app_name || "Lumen",
       tagline: map.app_tagline || "Cinema, streamed.",
       logoUrl: map.app_logo_url || "",
+      faviconUrl: map.app_favicon_url || "",
+      logoDisplay: map.app_logo_display || "both",
       telegramUrl: map.telegram_url || "",
       whatsappUrl: map.whatsapp_url || "",
     };
   } catch {
-    return { name: "Lumen", tagline: "Cinema, streamed.", logoUrl: "", telegramUrl: "", whatsappUrl: "" };
+    return { name: "Lumen", tagline: "Cinema, streamed.", logoUrl: "", faviconUrl: "", logoDisplay: "both", telegramUrl: "", whatsappUrl: "" };
   }
 });
+
+// ---- Upload file to settings storage bucket ----
+
+export const uploadSettingFile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { fileName: string; fileBase64: string; contentType: string }) =>
+    z.object({ fileName: z.string(), fileBase64: z.string(), contentType: z.string() }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Ensure bucket exists
+    const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+    const bucketExists = buckets?.some((b: any) => b.name === "settings");
+    if (!bucketExists) {
+      await supabaseAdmin.storage.createBucket("settings", { public: true });
+    }
+
+    // Decode base64 and upload
+    const buffer = Buffer.from(data.fileBase64, "base64");
+    const filePath = `branding/${Date.now()}-${data.fileName}`;
+
+    const { error } = await supabaseAdmin.storage
+      .from("settings")
+      .upload(filePath, buffer, { contentType: data.contentType, upsert: true });
+
+    if (error) throw new Error(`Upload failed: ${error.message}`);
+
+    const { data: urlData } = supabaseAdmin.storage.from("settings").getPublicUrl(filePath);
+    return { url: urlData.publicUrl };
+  });
