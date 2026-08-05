@@ -16,9 +16,10 @@ export const listSubscriptionPlans = createServerFn({ method: "GET" }).handler(a
 export const getMyBilling = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const [subRes, paymentsRes] = await Promise.all([
-      context.supabase.from("subscriptions").select("*, subscription_plans(name, description, price_cents, currency, interval, features)").eq("user_id", context.userId).maybeSingle(),
-      context.supabase.from("payment_history").select("*").eq("user_id", context.userId).order("created_at", { ascending: false }).limit(50),
+      supabaseAdmin.from("subscriptions").select("*, subscription_plans(name, description, price_cents, currency, interval, features)").eq("user_id", context.userId).maybeSingle(),
+      supabaseAdmin.from("payment_history").select("*").eq("user_id", context.userId).order("created_at", { ascending: false }).limit(50),
     ]);
     return { subscription: subRes.data, payments: paymentsRes.data ?? [] };
   });

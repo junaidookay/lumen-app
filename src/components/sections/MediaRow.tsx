@@ -86,7 +86,7 @@ export function MediaRow({ row, variant = "poster", className, onSelect }: Media
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pb-4 sm:px-6 lg:px-10"
+        className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-5 pb-4 sm:px-6 lg:px-10"
       >
         {row.items.map((item, i) => (
           <div key={item.id + i} className="snap-start">

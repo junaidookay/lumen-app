@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getProfile, updateProfile } from "@/services/library";
 import { useAuth } from "@/hooks/use-auth";
 import { useAppName } from "@/hooks/use-app-name";
+import { uploadSettingFile } from "@/lib/admin/settings.functions";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({ meta: [{ title: "Profile — Watch Box" }, { name: "robots", content: "noindex" }] }),
@@ -57,9 +58,35 @@ function Page() {
               <AvatarImage src={avatarUrl || undefined} />
               <AvatarFallback>{(displayName || user?.email || "?").slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div className="flex-1">
+            <div className="flex-1 space-y-2">
               <Label htmlFor="avatar">Avatar URL</Label>
-              <Input id="avatar" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://…" />
+              <div className="flex gap-2">
+                <Input id="avatar" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://…" className="flex-1" />
+                <label className="h-9 shrink-0 px-4 rounded-full border border-white/10 bg-white/5 text-sm flex items-center gap-2 cursor-pointer hover:bg-white/10 transition">
+                  <span>Upload</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = async () => {
+                        const base64 = (reader.result as string).split(",")[1];
+                        try {
+                          const res = await uploadSettingFile({ data: { fileName: file.name, fileBase64: base64, contentType: file.type } });
+                          setAvatarUrl(res.url);
+                          toast.success("Avatar uploaded");
+                        } catch (err: any) {
+                          toast.error(err?.message ?? "Upload failed");
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+              </div>
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

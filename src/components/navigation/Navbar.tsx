@@ -1,17 +1,31 @@
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "motion/react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Bell } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { NAV_LINKS, SITE } from "@/constants/site";
 import { cn } from "@/lib/utils";
 import { AccountMenu } from "@/components/navigation/AccountMenu";
 import { getBranding } from "@/lib/admin/settings.functions";
+import { usePermissions } from "@/hooks/use-permissions";
+import { isPremium } from "@/lib/permissions";
+import { listNotifications } from "@/services/library";
+import { useAuth } from "@/hooks/use-auth";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user } = useAuth();
+  const { data: perms } = usePermissions();
+  const premium = isPremium(perms);
+
+  const { data: notifs } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: listNotifications,
+    enabled: !!user,
+  });
+  const unread = (notifs ?? []).filter((n: any) => !n.read).length;
 
   // Start with static defaults to avoid hydration mismatch, then update from DB
   const [appName, setAppName] = useState<string>(SITE.name);
@@ -99,12 +113,32 @@ export function Navbar() {
           <div className="ml-auto flex items-center gap-2">
             <Link
               to="/billing"
-              aria-label="Subscribe"
+              aria-label={premium ? "Manage subscription" : "Subscribe"}
               data-touch-target
-              className="h-10 items-center justify-center rounded-full bg-gradient-to-r from-[#1a5fb4] to-[#e65100] px-4 text-xs font-medium text-white shadow-[var(--shadow-glow)] hover:opacity-90 inline-flex"
+              className={cn(
+                "h-10 items-center justify-center rounded-full px-4 text-xs font-medium text-white shadow-[var(--shadow-glow)] hover:opacity-90 inline-flex",
+                premium
+                  ? "bg-emerald-600"
+                  : "bg-gradient-to-r from-[#1a5fb4] to-[#e65100]",
+              )}
             >
-              Subscribe
+              {premium ? "Premium" : "Subscribe"}
             </Link>
+            {user && (
+              <Link
+                to="/notifications"
+                aria-label="Notifications"
+                data-touch-target
+                className="relative grid h-10 w-10 place-items-center rounded-full glass transition hover:bg-white/10"
+              >
+                <Bell className="h-4 w-4" />
+                {unread > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-semibold text-brand-foreground">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </Link>
+            )}
             <AccountMenu />
             <button
               type="button"
