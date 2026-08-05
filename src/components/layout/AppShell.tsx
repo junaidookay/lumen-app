@@ -8,6 +8,7 @@ import { BottomNav } from "@/pwa/components/BottomNav";
 import { OfflineQueueInspector } from "@/pwa/components/OfflineQueueInspector";
 import { PreloadProvider } from "@/pwa/components/PreloadProvider";
 import { AdsterraSocialBar } from "@/components/ads/AdsterraSocialBar";
+import { FloatingSocials } from "@/components/FloatingSocials";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePWA } from "@/pwa/hooks/use-pwa";
 
@@ -29,6 +30,7 @@ export function AppShell({ children, hideFooter }: { children: ReactNode; hideFo
       <OfflineQueueInspector />
       <SmartInstallBanner />
       <AdsterraSocialBar />
+      <FloatingSocials />
     </div>
   );
 }

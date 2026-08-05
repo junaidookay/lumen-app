@@ -83,3 +83,26 @@ export async function getTmdbApiKey(): Promise<string | null> {
     return null;
   }
 }
+
+// ---- Get branding settings (public, no auth needed) ----
+
+export const getBranding = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await (supabaseAdmin as any)
+      .from("settings")
+      .select("key, value")
+      .in("key", ["app_name", "app_tagline", "app_logo_url", "telegram_url", "whatsapp_url"]);
+    const map: Record<string, string> = {};
+    for (const row of data ?? []) map[row.key] = row.value;
+    return {
+      name: map.app_name || "Lumen",
+      tagline: map.app_tagline || "Cinema, streamed.",
+      logoUrl: map.app_logo_url || "",
+      telegramUrl: map.telegram_url || "",
+      whatsappUrl: map.whatsapp_url || "",
+    };
+  } catch {
+    return { name: "Lumen", tagline: "Cinema, streamed.", logoUrl: "", telegramUrl: "", whatsappUrl: "" };
+  }
+});

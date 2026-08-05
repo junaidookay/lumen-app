@@ -2,14 +2,25 @@ import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { Menu, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { NAV_LINKS, SITE } from "@/constants/site";
 import { cn } from "@/lib/utils";
 import { AccountMenu } from "@/components/navigation/AccountMenu";
+import { getBranding } from "@/lib/admin/settings.functions";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const { data: branding } = useQuery({
+    queryKey: ["branding"],
+    queryFn: () => getBranding(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const appName = branding?.name || SITE.name;
+  const logoUrl = branding?.logoUrl || "";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -31,14 +42,18 @@ export function Navbar() {
       >
         <div className="mx-auto flex h-16 max-w-[1800px] items-center gap-6 px-4 sm:px-6 lg:px-10">
           <Link to="/" className="flex shrink-0 items-center gap-2">
-            <span
-              aria-hidden
-              className="grid h-9 w-9 place-items-center rounded-xl"
-              style={{ background: "var(--gradient-brand)", boxShadow: "var(--shadow-glow)" }}
-            >
-              <span className="text-lg font-bold leading-none text-white">L</span>
-            </span>
-            <span className="text-lg font-semibold tracking-tight">{SITE.name}</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt={appName} className="h-9 w-9 rounded-xl object-contain" />
+            ) : (
+              <span
+                aria-hidden
+                className="grid h-9 w-9 place-items-center rounded-xl"
+                style={{ background: "var(--gradient-brand)", boxShadow: "var(--shadow-glow)" }}
+              >
+                <span className="text-lg font-bold leading-none text-white">{appName.charAt(0)}</span>
+              </span>
+            )}
+            <span className="text-lg font-semibold tracking-tight">{appName}</span>
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
@@ -73,7 +88,7 @@ export function Navbar() {
               to="/billing"
               aria-label="Subscribe"
               data-touch-target
-              className="hidden h-10 items-center justify-center rounded-full bg-gradient-to-r from-[#1a5fb4] to-[#e65100] px-4 text-xs font-medium text-white shadow-[var(--shadow-glow)] hover:opacity-90 md:inline-flex"
+              className="h-10 items-center justify-center rounded-full bg-gradient-to-r from-[#1a5fb4] to-[#e65100] px-4 text-xs font-medium text-white shadow-[var(--shadow-glow)] hover:opacity-90 inline-flex"
             >
               Subscribe
             </Link>
@@ -109,7 +124,7 @@ export function Navbar() {
               className="absolute inset-y-0 right-0 flex w-[85%] max-w-sm flex-col bg-surface p-6 shadow-[var(--shadow-elevated)]"
             >
               <div className="flex items-center justify-between">
-                <span className="text-lg font-semibold">{SITE.name}</span>
+                <span className="text-lg font-semibold">{appName}</span>
                 <button
                   type="button"
                   aria-label="Close menu"

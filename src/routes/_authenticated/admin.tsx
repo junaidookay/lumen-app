@@ -1127,8 +1127,10 @@ function Analytics() {
 function Ads() {
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["ad-placements"], queryFn: () => listAdPlacements() });
+  const [editingSlot, setEditingSlot] = useState<string | null>(null);
+  const [configDraft, setConfigDraft] = useState("");
   const mut = useMutation({
-    mutationFn: (v: { slot: string; provider?: string; is_enabled?: boolean }) =>
+    mutationFn: (v: { slot: string; provider?: string; is_enabled?: boolean; config?: Record<string, unknown> }) =>
       updateAdPlacement({ data: v }),
     onSuccess: () => {
       toast.success("Updated");
@@ -1141,43 +1143,90 @@ function Ads() {
       <p className="text-sm text-muted-foreground">
         Adsterra is the primary ad network. Premium users always skip ads.
       </p>
-      {(data ?? []).map((p: any) => (
-        <div
-          key={p.slot}
-          className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/5 glass p-4"
-        >
-          <div>
-            <p className="font-medium">
-              {AD_SLOT_LABELS[p.slot as keyof typeof AD_SLOT_LABELS] ?? p.slot}
-            </p>
-            <p className="text-xs text-muted-foreground">{p.slot}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Select
-              value={p.provider}
-              onValueChange={(v) => mut.mutate({ slot: p.slot, provider: v })}
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {AD_PROVIDERS.map((prov) => (
-                  <SelectItem key={prov.id} value={prov.id}>
-                    {prov.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Enabled</span>
-              <Switch
-                checked={p.is_enabled}
-                onCheckedChange={(v) => mut.mutate({ slot: p.slot, is_enabled: v })}
-              />
+      {(data ?? []).map((p: any) => {
+        const isEditing = editingSlot === p.slot;
+        const config = (p.config as any) ?? {};
+        return (
+          <div key={p.slot} className="rounded-2xl border border-white/5 glass p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="font-medium">
+                  {AD_SLOT_LABELS[p.slot as keyof typeof AD_SLOT_LABELS] ?? p.slot}
+                </p>
+                <p className="text-xs text-muted-foreground">{p.slot}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Select
+                  value={p.provider}
+                  onValueChange={(v) => mut.mutate({ slot: p.slot, provider: v })}
+                >
+                  <SelectTrigger className="w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AD_PROVIDERS.map((prov) => (
+                      <SelectItem key={prov.id} value={prov.id}>
+                        {prov.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Enabled</span>
+                  <Switch
+                    checked={p.is_enabled}
+                    onCheckedChange={(v) => mut.mutate({ slot: p.slot, is_enabled: v })}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (isEditing) {
+                      setEditingSlot(null);
+                    } else {
+                      setEditingSlot(p.slot);
+                      setConfigDraft(JSON.stringify(config, null, 2));
+                    }
+                  }}
+                >
+                  {isEditing ? "Close" : "Config"}
+                </Button>
+              </div>
             </div>
+            {isEditing && (
+              <div className="space-y-2 border-t border-white/5 pt-3">
+                <p className="text-xs text-muted-foreground">
+                  JSON config. For Adsterra: set <code className="bg-white/5 px-1">banner_code</code> for banner/inline slots.
+                  For house ads: set <code className="bg-white/5 px-1">headline</code> and <code className="bg-white/5 px-1">body</code>.
+                </p>
+                <Textarea
+                  value={configDraft}
+                  onChange={(e) => setConfigDraft(e.target.value)}
+                  rows={6}
+                  className="font-mono text-xs"
+                  placeholder='{"banner_code": "<iframe>...</iframe>", "headline": "Ad title", "body": "Ad description"}'
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    try {
+                      const parsed = JSON.parse(configDraft);
+                      mut.mutate({ slot: p.slot, config: parsed });
+                      setEditingSlot(null);
+                    } catch {
+                      toast.error("Invalid JSON");
+                    }
+                  }}
+                  disabled={mut.isPending}
+                >
+                  Save config
+                </Button>
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -1443,6 +1492,7 @@ function SettingsTab() {
     onSuccess: () => {
       toast.success("Setting saved");
       qc.invalidateQueries({ queryKey: ["admin", "settings"] });
+      qc.invalidateQueries({ queryKey: ["branding"] });
     },
   });
 
@@ -1450,10 +1500,40 @@ function SettingsTab() {
 
   const BUILTIN_SETTINGS = [
     {
+      key: "app_name",
+      label: "App Name",
+      description: "Display name shown in the navbar, PWA manifest, and browser tab.",
+      placeholder: "Lumen",
+    },
+    {
+      key: "app_tagline",
+      label: "Tagline",
+      description: "Short tagline shown under the app name.",
+      placeholder: "Cinema, streamed.",
+    },
+    {
+      key: "app_logo_url",
+      label: "Logo URL",
+      description: "URL to a logo image. Leave empty to use the default gradient letter.",
+      placeholder: "https://example.com/logo.png",
+    },
+    {
       key: "tmdb_api_key",
       label: "TMDB API Key",
-      description:
-        "v4 Read Access Token for importing titles from The Movie Database. Stored in the database.",
+      description: "v4 Read Access Token for importing titles from The Movie Database.",
+      placeholder: "eyJhbGciOiJIUzI1NiJ9...",
+    },
+    {
+      key: "telegram_url",
+      label: "Telegram Channel URL",
+      description: "Link shown on the floating Telegram button.",
+      placeholder: "https://t.me/yourchannel",
+    },
+    {
+      key: "whatsapp_url",
+      label: "WhatsApp Channel URL",
+      description: "Link shown on the floating WhatsApp button.",
+      placeholder: "https://chat.whatsapp.com/...",
     },
   ];
 
@@ -1474,8 +1554,8 @@ function SettingsTab() {
           </div>
           <div className="flex gap-3">
             <Input
-              type="password"
-              placeholder={s.key === "tmdb_api_key" ? "eyJhbGciOiJIUzI1NiJ9..." : "Value"}
+              type={s.key.includes("key") || s.key.includes("secret") ? "password" : "text"}
+              placeholder={s.placeholder}
               value={getVal(s.key)}
               onChange={(e) => setForm((f) => ({ ...f, [s.key]: e.target.value }))}
               className="flex-1"
