@@ -134,7 +134,8 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
-    registerSW();
+    // SW registration handled by vite-plugin-pwa (virtual:pwa-register)
+    // Manual registration removed — was causing 404 with TanStack Start + Nitro
   }, []);
 
   useInstallDetection();

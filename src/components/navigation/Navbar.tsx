@@ -13,14 +13,23 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  // Start with static defaults to avoid hydration mismatch, then update from DB
+  const [appName, setAppName] = useState<string>(SITE.name);
+  const [logoUrl, setLogoUrl] = useState<string>("");
+
   const { data: branding } = useQuery({
     queryKey: ["branding"],
     queryFn: () => getBranding(),
     staleTime: 5 * 60 * 1000,
   });
 
-  const appName = branding?.name || SITE.name;
-  const logoUrl = branding?.logoUrl || "";
+  // Sync query result after mount (client-only, avoids SSR mismatch)
+  useEffect(() => {
+    if (branding) {
+      if (branding.name) setAppName(branding.name);
+      if (branding.logoUrl) setLogoUrl(branding.logoUrl);
+    }
+  }, [branding]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);

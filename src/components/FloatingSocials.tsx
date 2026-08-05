@@ -1,24 +1,31 @@
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MessageCircle, Send } from "lucide-react";
 import { getBranding } from "@/lib/admin/settings.functions";
 
 export function FloatingSocials() {
+  const [urls, setUrls] = useState<{ telegram: string; whatsapp: string }>({ telegram: "", whatsapp: "" });
+
   const { data: branding } = useQuery({
     queryKey: ["branding"],
     queryFn: () => getBranding(),
     staleTime: 5 * 60 * 1000,
   });
 
-  const telegramUrl = branding?.telegramUrl || "";
-  const whatsappUrl = branding?.whatsappUrl || "";
+  // Sync after mount to avoid SSR hydration mismatch
+  useEffect(() => {
+    if (branding) {
+      setUrls({ telegram: branding.telegramUrl || "", whatsapp: branding.whatsappUrl || "" });
+    }
+  }, [branding]);
 
-  if (!telegramUrl && !whatsappUrl) return null;
+  if (!urls.telegram && !urls.whatsapp) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
-      {whatsappUrl && (
+      {urls.whatsapp && (
         <a
-          href={whatsappUrl}
+          href={urls.whatsapp}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="WhatsApp channel"
@@ -27,9 +34,9 @@ export function FloatingSocials() {
           <MessageCircle className="h-5 w-5" />
         </a>
       )}
-      {telegramUrl && (
+      {urls.telegram && (
         <a
-          href={telegramUrl}
+          href={urls.telegram}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Telegram channel"
