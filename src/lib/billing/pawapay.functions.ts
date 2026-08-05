@@ -29,17 +29,21 @@ export const initiatePawaPayCheckout = createServerFn({ method: "POST" })
     const country = PAWAPAY_COUNTRIES.find((c) => c.code === data.country);
     if (!country) throw new Error("Unsupported country");
 
-    const paymentRef = `LUMEN-${context.userId.slice(0, 8)}-${Date.now()}`;
+    const depositId = crypto.randomUUID();
     const amount = getPawaPayAmount(country.currency);
 
     const payment = await initiatePawaPayPayment({
       country: country.code,
       currency: country.currency,
       amount,
-      payer: { type: "MSISDN", value: data.msisdn },
-      paymentReference: paymentRef,
-      statementDescription: "Watch Box Premium",
-      callbackUrl: `${process.env.SITE_URL || "https://www.watchbox.site"}/api/pawapay/webhook`,
+      payer: {
+        type: "MMO",
+        accountDetails: {
+          phoneNumber: data.msisdn,
+          provider: country.provider,
+        },
+      },
+      depositId,
     });
 
     // Store the pending payment
@@ -118,9 +122,9 @@ export async function handlePawaPayWebhook(payload: PawaPayWebhookPayload): Prom
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
-  console.log(`[pawapay:webhook] Payment ${payload.paymentId} status: ${payload.status}`);
+  console.log(`[pawapay:webhook] Deposit ${payload.depositId} status: ${payload.status}`);
 
-  // Find the pending payment and associated user
+  // Find the pending payment by deposit ID stored in description
   const { data: payment } = await supabase
     .from("payment_history")
     .select("*")
@@ -130,7 +134,7 @@ export async function handlePawaPayWebhook(payload: PawaPayWebhookPayload): Prom
     .single();
 
   if (!payment) {
-    console.warn(`[pawapay:webhook] No pending payment found for ${payload.paymentId}`);
+    console.warn(`[pawapay:webhook] No pending payment found for ${payload.depositId}`);
     return;
   }
 
@@ -164,7 +168,7 @@ export async function handlePawaPayWebhook(payload: PawaPayWebhookPayload): Prom
       action: "payment.pawapay.completed",
       target_type: "payment",
       target_id: payment.id,
-      meta: { amount: payload.amount, currency: payload.currency, country: payload.country } as any,
+      meta: { amount: payload.amount, currency: payload.currency } as any,
     });
   } else if (payload.status === "FAILED") {
     await supabase

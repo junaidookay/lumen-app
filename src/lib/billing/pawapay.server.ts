@@ -1,10 +1,8 @@
 /**
  * Server-only PawaPay client. Handles mobile money payments for African markets.
- * API docs: https://developers.pawapay.com/
+ * Uses PawaPay Merchant API V2: https://docs.pawapay.io/v2/
  */
 import { getEnv } from "@/env";
-
-const PAWAPAY_BASE = "https://api.pawapay.io/v1";
 
 export interface PawaPayConfig {
   apiKey: string;
@@ -19,6 +17,11 @@ function getConfig(): PawaPayConfig {
   return { apiKey, environment: environment as "sandbox" | "production" };
 }
 
+function getBaseUrl(): string {
+  const { environment } = getConfig();
+  return environment === "production" ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
+}
+
 function headers(): Record<string, string> {
   const { apiKey } = getConfig();
   return {
@@ -27,124 +30,113 @@ function headers(): Record<string, string> {
   };
 }
 
-// ---- Country-specific pricing (all same flat rate) ----
+// ---- Country config with provider mapping ----
 export const PAWAPAY_COUNTRIES = [
-  { code: "UG", currency: "UGX", label: "Uganda" },
-  { code: "TZ", currency: "TZS", label: "Tanzania" },
-  { code: "NG", currency: "NGN", label: "Nigeria" },
-  { code: "KE", currency: "KES", label: "Kenya" },
-  { code: "BI", currency: "BIF", label: "Burundi" },
-  { code: "RW", currency: "RWF", label: "Rwanda" },
+  { code: "UG", currency: "UGX", label: "Uganda", provider: "MTN_MOMO_UGA" },
+  { code: "TZ", currency: "TZS", label: "Tanzania", provider: "MTN_MOMO_TZA" },
+  { code: "NG", currency: "NGN", label: "Nigeria", provider: "MTN_MOMO_NGA" },
+  { code: "KE", currency: "KES", label: "Kenya", provider: "MPESA_KEN" },
+  { code: "BI", currency: "BIF", label: "Burundi", provider: "LUMICASH_BUR" },
+  { code: "RW", currency: "RWF", label: "Rwanda", provider: "MTN_MOMO_RWA" },
 ] as const;
 
-export const PAWAPAY_PRICE_CENTS = 500; // $5.00 equivalent in local currency
+export const PAWAPAY_PRICE_CENTS = 500;
 
 export function getCountryByCurrency(currency: string) {
   return PAWAPAY_COUNTRIES.find((c) => c.currency === currency.toUpperCase());
 }
 
 export function getPawaPayAmount(currency: string): number {
-  // PawaPay amounts are in minor units of the currency.
-  // For UGX (no decimal), amount = price in UGX.
-  // For others, amount = price * 100.
-  const noDecimal = ["UGX", "BIF", "RWF", "JPY"];
-  if (noDecimal.includes(currency.toUpperCase())) {
-    return PAWAPAY_PRICE_CENTS; // e.g., 500 UGX
-  }
-  return PAWAPAY_PRICE_CENTS; // e.g., 5.00 USD = 500 cents
+  return PAWAPAY_PRICE_CENTS;
 }
 
-// ---- API Types ----
+// ---- V2 API Types ----
 
 export interface InitiatePaymentRequest {
   country: string;
   currency: string;
   amount: number;
   payer: {
-    type: "MSISDN";
-    value: string; // e.g., "+256700000000"
+    type: "MMO";
+    accountDetails: {
+      phoneNumber: string;
+      provider: string;
+    };
   };
-  paymentReference: string;
-  statementDescription: string;
-  callbackUrl: string;
+  depositId: string;
 }
 
 export interface PawaPayPayment {
   paymentId: string;
-  status: "INITIATED" | "ACCEPTED" | "COMPLETED" | "FAILED" | "REFUNDED";
+  status: "ACCEPTED" | "REJECTED" | "COMPLETED" | "FAILED" | "DUPLICATE_IGNORED";
   amount: number;
   currency: string;
   country: string;
 }
 
 export interface PawaPayWebhookPayload {
-  paymentId: string;
-  status: "INITIATED" | "ACCEPTED" | "COMPLETED" | "FAILED" | "REFUNDED";
+  depositId: string;
+  status: "ACCEPTED" | "COMPLETED" | "FAILED" | "REJECTED" | "REFUNDED";
   amount: number;
   currency: string;
-  country: string;
-  payer: { type: string; value: string };
-  paymentReference: string;
-  transactionId?: string;
+  payer: { type: string; accountDetails: { phoneNumber: string; provider: string } };
+  clientReferenceId?: string;
+  failureReason?: { failureCode: string; failureMessage: string };
 }
 
-// ---- API Methods ----
+// ---- V2 API Methods ----
 
 export async function initiatePawaPayPayment(req: InitiatePaymentRequest): Promise<PawaPayPayment> {
-  const { environment } = getConfig();
-  const baseUrl = environment === "production" ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
-  const url = `${baseUrl}/v1/payments`;
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v2/deposits`;
 
-  console.log(`[pawapay] Initiating payment: ${req.paymentReference} for ${req.amount} ${req.currency}`);
+  console.log(`[pawapay] Initiating deposit: ${req.depositId} for ${req.amount} ${req.currency}`);
 
   const response = await fetch(url, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({
-      country: req.country,
+      depositId: req.depositId,
+      amount: String(req.amount),
       currency: req.currency,
-      amount: req.amount,
       payer: req.payer,
-      paymentReference: req.paymentReference,
-      statementDescription: req.statementDescription,
-      callbackUrl: req.callbackUrl,
     }),
   });
 
-  if (!response.ok) {
-    const body = await response.text();
-    console.error(`[pawapay] Payment initiation failed: ${response.status} ${body}`);
-    throw new Error(`PawaPay payment failed: ${response.status}`);
+  const data = await response.json();
+
+  if (!response.ok || data.status === "REJECTED") {
+    const failure = data.failureReason ?? {};
+    console.error(`[pawapay] Deposit rejected: ${response.status}`, data);
+    throw new Error(`PawaPay: ${failure.failureCode ?? "UNKNOWN_ERROR"} — ${failure.failureMessage ?? "Payment failed"}`);
   }
 
-  const data = await response.json();
   return {
-    paymentId: data.paymentId ?? data.id ?? "",
-    status: data.status ?? "INITIATED",
+    paymentId: data.depositId ?? req.depositId,
+    status: data.status ?? "ACCEPTED",
     amount: req.amount,
     currency: req.currency,
     country: req.country,
   };
 }
 
-export async function checkPawaPayPayment(paymentId: string): Promise<PawaPayPayment> {
-  const { environment } = getConfig();
-  const baseUrl = environment === "production" ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
-  const url = `${baseUrl}/v1/payments/${paymentId}`;
+export async function checkPawaPayPayment(depositId: string): Promise<PawaPayPayment> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v2/deposits/${depositId}`;
 
   const response = await fetch(url, { headers: headers() });
 
   if (!response.ok) {
     const body = await response.text();
-    console.error(`[pawapay] Payment check failed: ${response.status} ${body}`);
-    throw new Error(`PawaPay payment check failed: ${response.status}`);
+    console.error(`[pawapay] Deposit check failed: ${response.status} ${body}`);
+    throw new Error(`PawaPay deposit check failed: ${response.status}`);
   }
 
   const data = await response.json();
   return {
-    paymentId: data.paymentId ?? data.id ?? paymentId,
-    status: data.status ?? "INITIATED",
-    amount: data.amount ?? 0,
+    paymentId: data.depositId ?? depositId,
+    status: data.status ?? "ACCEPTED",
+    amount: Number(data.amount ?? 0),
     currency: data.currency ?? "",
     country: data.country ?? "",
   };
@@ -156,6 +148,5 @@ export async function checkPawaPayPayment(paymentId: string): Promise<PawaPayPay
  */
 export function verifyPawaPayWebhook(body: string, _signature: string | null): boolean {
   // TODO: Implement HMAC verification when PawaPay provides the shared secret
-  // For now, we trust the webhook endpoint (protected by obscurity + rate limiting)
   return true;
 }
