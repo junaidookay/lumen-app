@@ -7,7 +7,7 @@ import { listFavorites } from "@/services/library";
 import { getMedia } from "@/services/media";
 
 export const Route = createFileRoute("/_authenticated/library/favorites")({
-  head: () => ({ meta: [{ title: "Favorites — Lumen" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Favorites — Watch Box" }, { name: "robots", content: "noindex" }] }),
   component: Page,
 });
 

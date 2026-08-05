@@ -20,7 +20,7 @@ export const Route = createFileRoute("/tv/$id")({
       throw notFound();
     }
   },
-  head: () => ({ meta: [{ title: "Series — Lumen" }] }),
+  head: () => ({ meta: [{ title: "Series — Watch Box" }] }),
   component: TVDetail,
 });
 

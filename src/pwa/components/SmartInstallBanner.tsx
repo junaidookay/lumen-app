@@ -4,6 +4,7 @@ import { X, Download } from "lucide-react";
 import { useInstall } from "@/pwa/hooks/use-install";
 import { useVideoPlayback } from "@/pwa/hooks/use-video-playback";
 import { trackInstallEvent } from "@/pwa/services/install-analytics";
+import { useAppName } from "@/hooks/use-app-name";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "lumen-install-reminder";
@@ -53,6 +54,7 @@ function shouldShowReminder(): boolean {
 
 export function SmartInstallBanner() {
   const { platform, canInstall, isInstalled, install, wasDismissed } = useInstall();
+  const appName = useAppName();
   const isPlaying = useVideoPlayback();
   const [visible, setVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -159,7 +161,7 @@ export function SmartInstallBanner() {
               <Download className="h-5 w-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">Install Lumen</p>
+              <p className="text-sm font-medium text-foreground">Install {appName}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {platform === "ios"
                   ? "Tap Share, then 'Add to Home Screen'"

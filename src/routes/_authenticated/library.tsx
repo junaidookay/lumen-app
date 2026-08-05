@@ -9,7 +9,7 @@ import { getMedia } from "@/services/media";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/library")({
-  head: () => ({ meta: [{ title: "My Watchlist — Lumen" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "My Watchlist — Watch Box" }, { name: "robots", content: "noindex" }] }),
   component: Page,
 });
 

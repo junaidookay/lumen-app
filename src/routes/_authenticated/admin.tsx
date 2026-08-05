@@ -66,7 +66,7 @@ import { searchTmdbTitles, batchImportTmdbTitles } from "@/lib/tmdb/tmdb-import.
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Admin — Lumen" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Admin — Watch Box" }, { name: "robots", content: "noindex" }] }),
   component: AdminPage,
 });
 
@@ -1539,7 +1539,7 @@ function SettingsTab() {
           <p className="text-xs text-muted-foreground">Display name shown in the navbar, PWA manifest, and browser tab.</p>
         </div>
         <div className="flex gap-3">
-          <Input placeholder="Lumen" value={getVal("app_name")} onChange={(e) => setForm((f) => ({ ...f, app_name: e.target.value }))} className="flex-1" />
+          <Input placeholder="Watch Box" value={getVal("app_name")} onChange={(e) => setForm((f) => ({ ...f, app_name: e.target.value }))} className="flex-1" />
           <Button variant="outline" size="sm" onClick={() => upsertMut.mutate({ key: "app_name", value: getVal("app_name") })} disabled={upsertMut.isPending || !getVal("app_name")}>Save</Button>
         </div>
       </div>

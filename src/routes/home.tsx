@@ -12,9 +12,9 @@ import { useAuth } from "@/hooks/use-auth";
 export const Route = createFileRoute("/home")({
   head: () => ({
     meta: [
-      { title: "Browse — Lumen" },
+      { title: "Browse — Watch Box" },
       { name: "description", content: "Browse trending, popular and top-rated films and series, tailored to you." },
-      { property: "og:title", content: "Browse — Lumen" },
+      { property: "og:title", content: "Browse — Watch Box" },
       { property: "og:description", content: "Browse trending, popular and top-rated films and series, tailored to you." },
     ],
   }),

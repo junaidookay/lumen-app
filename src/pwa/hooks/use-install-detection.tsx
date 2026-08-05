@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { markInstalled } from "@/pwa/components/SmartInstallBanner";
+import { useAppName } from "@/hooks/use-app-name";
 
 export function useInstallDetection() {
+  const appName = useAppName();
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -16,8 +18,8 @@ export function useInstallDetection() {
         const parsed = state ? JSON.parse(state) : {};
         if (!parsed.installed) {
           markInstalled();
-          toast.success("Lumen is installed!", {
-            description: "You can now access Lumen from your home screen.",
+          toast.success(`${appName} is installed!`, {
+            description: `You can now access ${appName} from your home screen.`,
             duration: 5000,
           });
         }
@@ -32,5 +34,5 @@ export function useInstallDetection() {
     };
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, []);
+  }, [appName]);
 }

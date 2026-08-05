@@ -20,7 +20,7 @@ import {
 import { redeemCode, checkDownloadEligibility } from "@/lib/billing/redemption.functions";
 
 export const Route = createFileRoute("/_authenticated/billing")({
-  head: () => ({ meta: [{ title: "Billing — Lumen" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Billing — Watch Box" }, { name: "robots", content: "noindex" }] }),
   component: BillingPage,
 });
 
@@ -43,7 +43,7 @@ function BillingPage() {
   const plans = useQuery({ queryKey: ["billing", "plans"], queryFn: () => listSubscriptionPlans() });
   const downloads = useQuery({ queryKey: ["billing", "downloads"], queryFn: () => checkDownloadEligibility() });
   const [checkoutBusy, setCheckoutBusy] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"stripe" | "pawapay" | "code">("stripe");
+  const [activeTab, setActiveTab] = useState<"stripe" | "pawapay" | "code">("pawapay");
 
   // PawaPay state
   const [selectedCountry, setSelectedCountry] = useState(PAWAPAY_COUNTRIES[0]);
@@ -257,7 +257,9 @@ function BillingPage() {
                           {checkoutBusy === plan.id ? "Redirecting..." : "Upgrade"}
                         </Button>
                       ) : plan.id !== "free" && !plan.stripe_price_id ? (
-                        <span className="text-xs text-muted-foreground">Stripe price not configured yet.</span>
+                        <Button onClick={() => setActiveTab("pawapay")} className="rounded-full">
+                          Pay with Mobile Money
+                        </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground">Default plan for every account.</span>
                       )}

@@ -96,7 +96,7 @@ export const getBranding = createServerFn({ method: "GET" }).handler(async () =>
     const map: Record<string, string> = {};
     for (const row of data ?? []) map[row.key] = row.value;
     return {
-      name: map.app_name || "Lumen",
+      name: map.app_name || "Watch Box",
       tagline: map.app_tagline || "Cinema, streamed.",
       logoUrl: map.app_logo_url || "",
       faviconUrl: map.app_favicon_url || "",
@@ -105,7 +105,7 @@ export const getBranding = createServerFn({ method: "GET" }).handler(async () =>
       whatsappUrl: map.whatsapp_url || "",
     };
   } catch {
-    return { name: "Lumen", tagline: "Cinema, streamed.", logoUrl: "", faviconUrl: "", logoDisplay: "both", telegramUrl: "", whatsappUrl: "" };
+    return { name: "Watch Box", tagline: "Cinema, streamed.", logoUrl: "", faviconUrl: "", logoDisplay: "both", telegramUrl: "", whatsappUrl: "" };
   }
 });
 

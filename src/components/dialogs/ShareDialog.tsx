@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, Copy, Facebook, Link2, Twitter, X } from "lucide-react";
+import { useAppName } from "@/hooks/use-app-name";
 
-function openShare(url: string, label: string) {
-  const text = encodeURIComponent("Check this out on Lumen");
+function openShare(url: string, label: string, appName: string) {
+  const text = encodeURIComponent(`Check this out on ${appName}`);
   const encodedUrl = encodeURIComponent(url);
   const shareUrls: Record<string, string> = {
     X: `https://twitter.com/intent/tweet?text=${text}&url=${encodedUrl}`,
@@ -16,6 +17,7 @@ function openShare(url: string, label: string) {
 
 export function ShareDialog({ open, onClose, url, title }: { open: boolean; onClose: () => void; url: string; title: string }) {
   const [copied, setCopied] = useState(false);
+  const appName = useAppName();
   const doCopy = async () => {
     try {
       await navigator.clipboard.writeText(url);
@@ -52,7 +54,7 @@ export function ShareDialog({ open, onClose, url, title }: { open: boolean; onCl
               {socials.map((s) => (
                 <button
                   key={s.label}
-                  onClick={() => openShare(url, s.label)}
+                  onClick={() => openShare(url, s.label, appName)}
                   className="flex flex-col items-center gap-2 rounded-2xl border border-white/5 bg-surface-elevated py-4 text-sm hover:bg-white/10"
                 >
                   <s.icon className="h-5 w-5" />

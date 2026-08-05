@@ -1,9 +1,11 @@
 import { X, Download } from "lucide-react";
 import { useInstall } from "@/pwa/hooks/use-install";
+import { useAppName } from "@/hooks/use-app-name";
 import { cn } from "@/lib/utils";
 
 export function InstallBanner() {
   const { platform, canInstall, isInstalled, install, dismiss, wasDismissed } = useInstall();
+  const appName = useAppName();
 
   if (isInstalled || !canInstall || wasDismissed()) return null;
 
@@ -32,7 +34,7 @@ export function InstallBanner() {
             <Download className="h-5 w-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground">Install Lumen</p>
+            <p className="text-sm font-medium text-foreground">Install {appName}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {platform === "ios"
                 ? "Tap the share button, then 'Add to Home Screen'"

@@ -7,7 +7,7 @@ import { listNotifications, markAllNotificationsRead, markNotificationRead } fro
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/notifications")({
-  head: () => ({ meta: [{ title: "Notifications — Lumen" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Notifications — Watch Box" }, { name: "robots", content: "noindex" }] }),
   component: Page,
 });
 

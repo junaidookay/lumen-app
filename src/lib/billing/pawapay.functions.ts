@@ -38,8 +38,8 @@ export const initiatePawaPayCheckout = createServerFn({ method: "POST" })
       amount,
       payer: { type: "MSISDN", value: data.msisdn },
       paymentReference: paymentRef,
-      statementDescription: "Lumen Premium",
-      callbackUrl: `${process.env.SITE_URL || "https://lumen-app-roan.vercel.app"}/api/pawapay/webhook`,
+      statementDescription: "Watch Box Premium",
+      callbackUrl: `${process.env.SITE_URL || "https://www.watchbox.site"}/api/pawapay/webhook`,
     });
 
     // Store the pending payment

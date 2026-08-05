@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { SITE } from "@/constants/site";
+import { useAppName } from "@/hooks/use-app-name";
 
 const cols = [
   {
@@ -29,6 +29,7 @@ const cols = [
 ] as const;
 
 export function Footer() {
+  const appName = useAppName();
   return (
     <footer className="relative mt-24 border-t border-white/5">
       <div
@@ -44,11 +45,11 @@ export function Footer() {
               className="grid h-9 w-9 place-items-center rounded-xl"
               style={{ background: "var(--gradient-brand)" }}
             >
-              <span className="text-lg font-bold text-white">L</span>
+              <span className="text-lg font-bold text-white">{appName.charAt(0)}</span>
             </span>
-            <span className="text-lg font-semibold">{SITE.name}</span>
+            <span className="text-lg font-semibold">{appName}</span>
           </div>
-          <p className="mt-4 max-w-sm text-sm text-muted-foreground">{SITE.description}</p>
+          <p className="mt-4 max-w-sm text-sm text-muted-foreground">A premium streaming experience for movies and TV.</p>
         </div>
         {cols.map((col) => (
           <div key={col.title}>
@@ -70,8 +71,8 @@ export function Footer() {
       </div>
       <div className="border-t border-white/5">
         <div className="mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-3 px-4 py-6 text-xs text-muted-foreground sm:px-6 lg:px-10">
-          <span>© {new Date().getFullYear()} {SITE.name}. All rights reserved.</span>
-          <span>Crafted with care · Demo project</span>
+          <span>© {new Date().getFullYear()} {appName}. All rights reserved.</span>
+          <span>Crafted with care</span>
         </div>
       </div>
     </footer>

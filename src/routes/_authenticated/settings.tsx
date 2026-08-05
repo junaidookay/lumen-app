@@ -8,9 +8,10 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSettings, updateSettings, type UserSettings } from "@/services/library";
 import { useAuth } from "@/hooks/use-auth";
+import { useAppName } from "@/hooks/use-app-name";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [{ title: "Settings — Lumen" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Settings — Watch Box" }, { name: "robots", content: "noindex" }] }),
   component: Page,
 });
 
@@ -25,6 +26,7 @@ function Row({ title, description, control }: { title: string; description: stri
 
 function Page() {
   const { user } = useAuth();
+  const appName = useAppName();
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["settings", user?.id], queryFn: () => getSettings(user!.id), enabled: !!user });
   const [s, setS] = useState<Partial<UserSettings>>({});
@@ -69,7 +71,7 @@ function Page() {
           <h2 className="mb-1 mt-8 text-lg font-semibold">Notifications</h2>
           <div className="mt-3">
             <Row title="In-app notifications" description="Announcements, new episodes, and recommendations." control={<Switch checked={!!s.notifications_enabled} onCheckedChange={(v) => setS({ ...s, notifications_enabled: v })} />} />
-            <Row title="Email notifications" description="Occasional emails from Lumen." control={<Switch checked={!!s.email_notifications} onCheckedChange={(v) => setS({ ...s, email_notifications: v })} />} />
+            <Row title="Email notifications" description={`Occasional emails from ${appName}.`} control={<Switch checked={!!s.email_notifications} onCheckedChange={(v) => setS({ ...s, email_notifications: v })} />} />
           </div>
           <div className="mt-8 flex justify-end">
             <Button onClick={save} disabled={busy} className="rounded-full">{busy ? "Saving…" : "Save preferences"}</Button>

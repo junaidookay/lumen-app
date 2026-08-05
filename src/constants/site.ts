@@ -1,8 +1,8 @@
 export const SITE = {
-  name: "Lumen",
+  name: "Watch Box",
   tagline: "Cinema, streamed.",
   description:
-    "Lumen is a premium streaming experience for movies and TV — curated collections, cinematic recommendations, and a beautifully quiet interface.",
+    "Watch Box is a premium streaming experience for movies and TV — curated collections, cinematic recommendations, and a beautifully quiet interface.",
 } as const;
 
 export interface NavLink {

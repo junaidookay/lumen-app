@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { useInstall } from "@/pwa/hooks/use-install";
 import { useCapabilities } from "@/pwa/hooks/use-capabilities";
 import { trackInstallEvent } from "@/pwa/services/install-analytics";
+import { useAppName } from "@/hooks/use-app-name";
 
 export const Route = createFileRoute("/install")({
   component: InstallPage,
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/install")({
 function InstallPage() {
   const { platform, canInstall, isInstalled, install } = useInstall();
   const capabilities = useCapabilities();
+  const appName = useAppName();
 
   const handleInstall = async () => {
     trackInstallEvent({ name: "install_page.viewed", properties: { platform } });
@@ -46,7 +48,7 @@ function InstallPage() {
     {
       icon: Zap,
       title: "Faster launch",
-      description: "Open Lumen instantly from your home screen",
+      description: `Open ${appName} instantly from your home screen`,
     },
     {
       icon: Play,
@@ -67,15 +69,15 @@ function InstallPage() {
     },
     {
       question: "Will it use much storage?",
-      answer: "Lumen is designed to be lightweight. The app itself uses minimal storage. Cached content can be managed from your device settings.",
+      answer: `${appName} is designed to be lightweight. The app itself uses minimal storage. Cached content can be managed from your device settings.`,
     },
     {
       question: "How do I remove it?",
-      answer: "You can uninstall Lumen like any other app. On Android, long-press the icon and select Uninstall. On iOS, long-press and tap Remove App.",
+      answer: `You can uninstall ${appName} like any other app. On Android, long-press the icon and select Uninstall. On iOS, long-press and tap Remove App.`,
     },
     {
       question: "Does it cost anything?",
-      answer: "No. Installing Lumen is completely free. You keep the same account and subscription you already have.",
+      answer: `No. Installing ${appName} is completely free. You keep the same account and subscription you already have.`,
     },
   ];
 
@@ -97,12 +99,12 @@ function InstallPage() {
             <div className="mx-auto mb-6 grid h-20 w-20 place-items-center rounded-2xl" style={{ background: "var(--gradient-brand)", boxShadow: "var(--shadow-glow)" }}>
               <span className="text-3xl font-bold text-white">L</span>
             </div>
-            <p className="text-xs uppercase tracking-[0.25em] text-brand">Install Lumen</p>
+            <p className="text-xs uppercase tracking-[0.25em] text-brand">Install {appName}</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-6xl">
               Your cinema,<br />always within reach
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-foreground/85 sm:text-lg">
-              Install Lumen for instant access, offline viewing, and a native app experience — right from your browser.
+              Install {appName} for instant access, offline viewing, and a native app experience — right from your browser.
             </p>
           </motion.div>
 
@@ -114,7 +116,7 @@ function InstallPage() {
               className="mt-8 inline-flex items-center gap-2 rounded-full bg-emerald-500/15 px-6 py-3 text-sm font-medium text-emerald-400"
             >
               <Check className="h-4 w-4" />
-              Lumen is installed
+              {appName} is installed
             </motion.div>
           ) : canInstall ? (
             <motion.div
@@ -129,7 +131,7 @@ function InstallPage() {
                 className="rounded-full px-8 shadow-[var(--shadow-glow)]"
               >
                 <Download className="mr-2 h-4 w-4" />
-                Install Lumen
+                  Install {appName}
               </Button>
               <p className="mt-3 text-xs text-muted-foreground">
                 {platform === "android" && "Tap Install, then Add to Home Screen"}
@@ -154,7 +156,7 @@ function InstallPage() {
       <section className="px-4 sm:px-6 lg:px-10">
         <div className="mx-auto max-w-[1400px]">
           <div className="mb-8 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Why install Lumen?</h2>
+            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Why install {appName}?</h2>
             <p className="mt-1 text-sm text-muted-foreground">Everything you love, but faster and always available</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -188,10 +190,10 @@ function InstallPage() {
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">How to install</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {platform === "ios"
-                ? "A few taps and Lumen is on your home screen"
+                ? `A few taps and ${appName} is on your home screen`
                 : platform === "android"
-                  ? "Install Lumen in one tap"
-                  : "Add Lumen to your desktop in seconds"}
+                  ? `Install ${appName} in one tap`
+                  : `Add ${appName} to your desktop in seconds`}
             </p>
           </div>
 
@@ -200,7 +202,7 @@ function InstallPage() {
               {[
                 { step: "1", title: "Tap Share", icon: Share, description: "Tap the share button in Safari's toolbar" },
                 { step: "2", title: "Add to Home Screen", icon: Plus, description: "Scroll down and tap 'Add to Home Screen'" },
-                { step: "3", title: "Open Lumen", icon: Moon, description: "Find Lumen on your home screen and open it" },
+                { step: "3", title: `Open ${appName}`, icon: Moon, description: `Find ${appName} on your home screen and open it` },
               ].map((s, i) => (
                 <motion.div
                   key={s.step}
@@ -229,7 +231,7 @@ function InstallPage() {
               {[
                 { step: "1", title: "Tap Install", icon: Download, description: "Tap the Install button when prompted by your browser" },
                 { step: "2", title: "Confirm", icon: Check, description: "Confirm the installation in the dialog" },
-                { step: "3", title: "Open Lumen", icon: Play, description: "Find Lumen on your home screen and open it" },
+                { step: "3", title: `Open ${appName}`, icon: Play, description: `Find ${appName} on your home screen and open it` },
               ].map((s, i) => (
                 <motion.div
                   key={s.step}
@@ -258,7 +260,7 @@ function InstallPage() {
               {[
                 { step: "1", title: "Click the install icon", icon: Download, description: "Look for the install icon in your browser's address bar" },
                 { step: "2", title: "Confirm installation", icon: Check, description: "Click 'Install' in the confirmation dialog" },
-                { step: "3", title: "Launch Lumen", icon: Play, description: "Open Lumen from your desktop or applications" },
+                { step: "3", title: `Launch ${appName}`, icon: Play, description: `Open ${appName} from your desktop or applications` },
               ].map((s, i) => (
                 <motion.div
                   key={s.step}
@@ -291,7 +293,7 @@ function InstallPage() {
         <div className="mx-auto max-w-[1400px]">
           <div className="mb-8 text-center">
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Works on your device</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Lumen is available on all modern devices and browsers</p>
+            <p className="mt-1 text-sm text-muted-foreground">{appName} is available on all modern devices and browsers</p>
           </div>
           <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-3">
             {[
@@ -360,7 +362,7 @@ function InstallPage() {
                 Ready to install?
               </h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-white/80">
-                Get the full Lumen experience — faster, offline-ready, and always available.
+                Get the full {appName} experience — faster, offline-ready, and always available.
               </p>
               {canInstall && !isInstalled ? (
                 <Button
@@ -369,7 +371,7 @@ function InstallPage() {
                   className="mt-6 rounded-full bg-white px-8 text-black shadow-lg hover:bg-white/90"
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Install Lumen
+                Install {appName}
                 </Button>
               ) : isInstalled ? (
                 <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/20 px-6 py-3 text-sm font-medium text-white">

@@ -23,7 +23,7 @@ export const Route = createFileRoute("/movie/$id")({
     void loaderData;
     return {
       meta: [
-        { title: "Movie — Lumen" },
+        { title: "Movie — Watch Box" },
       ],
     };
   },

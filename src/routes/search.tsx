@@ -6,10 +6,10 @@ import { SearchExperience } from "@/components/search/SearchExperience";
 export const Route = createFileRoute("/search")({
   head: () => ({
     meta: [
-      { title: "Search — Lumen" },
-      { name: "description", content: "Search every movie and series in the Lumen catalogue." },
-      { property: "og:title", content: "Search — Lumen" },
-      { property: "og:description", content: "Search every movie and series in the Lumen catalogue." },
+      { title: "Search — Watch Box" },
+      { name: "description", content: "Search every movie and series in the Watch Box catalogue." },
+      { property: "og:title", content: "Search — Watch Box" },
+      { property: "og:description", content: "Search every movie and series in the Watch Box catalogue." },
       { name: "robots", content: "noindex" },
     ],
   }),

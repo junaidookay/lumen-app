@@ -8,12 +8,14 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { isPremium } from "@/lib/permissions";
 import { useQuery } from "@tanstack/react-query";
 import { listAdPlacements } from "@/lib/admin/admin.functions";
+import { useAppName } from "@/hooks/use-app-name";
 
 const DISMISS_KEY = "lumen_ad_social_bar_dismissed";
 const VIEW_DURATION_MS = 10_000;
 
 export function AdsterraSocialBar() {
   const { data: perms } = usePermissions();
+  const appName = useAppName();
   const { data: placements } = useQuery({
     queryKey: ["ad-placements"],
     queryFn: () => listAdPlacements(),
@@ -92,7 +94,7 @@ export function AdsterraSocialBar() {
         {!adCode && (
           <div className="flex items-center gap-3">
             <p className="text-xs uppercase tracking-[0.2em] text-brand">Sponsored</p>
-            <p className="text-sm text-muted-foreground">Support Lumen — view this ad</p>
+            <p className="text-sm text-muted-foreground">Support {appName} — view this ad</p>
           </div>
         )}
 

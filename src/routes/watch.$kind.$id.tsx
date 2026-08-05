@@ -38,7 +38,7 @@ export const Route = createFileRoute("/watch/$kind/$id")({
       throw notFound();
     }
   },
-  head: () => ({ meta: [{ title: "Watch — Lumen" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Watch — Watch Box" }, { name: "robots", content: "noindex" }] }),
   component: WatchPage,
 });
 

@@ -8,7 +8,7 @@ import { getMedia } from "@/services/media";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/library/continue")({
-  head: () => ({ meta: [{ title: "Continue Watching — Lumen" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Continue Watching — Watch Box" }, { name: "robots", content: "noindex" }] }),
   component: Page,
 });
 

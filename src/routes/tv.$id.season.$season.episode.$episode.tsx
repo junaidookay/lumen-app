@@ -16,11 +16,11 @@ export const Route = createFileRoute("/tv/$id/season/$season/episode/$episode")(
     return { show, season, episode, prev, next };
   },
   head: ({ loaderData }) => {
-    if (!loaderData) return { meta: [{ title: "Not found — Lumen" }, { name: "robots", content: "noindex" }] };
+    if (!loaderData) return { meta: [{ title: "Not found — Watch Box" }, { name: "robots", content: "noindex" }] };
     const { show, episode } = loaderData;
     return {
       meta: [
-        { title: `${show.title} · S${episode.seasonNumber}E${episode.episodeNumber} — Lumen` },
+        { title: `${show.title} · S${episode.seasonNumber}E${episode.episodeNumber} — Watch Box` },
         { name: "description", content: episode.overview.slice(0, 160) },
         { property: "og:title", content: `${show.title} · ${episode.title}` },
         { property: "og:image", content: episode.still },

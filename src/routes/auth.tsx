@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useAppName } from "@/hooks/use-app-name";
 
 type Search = { mode?: "signin" | "signup" | "reset"; redirect?: string };
 
@@ -19,8 +20,8 @@ export const Route = createFileRoute("/auth")({
   }),
   head: () => ({
     meta: [
-      { title: "Sign in — Lumen" },
-      { name: "description", content: "Sign in to Lumen to build your watchlist, favorites, and continue watching." },
+      { title: "Sign in — Watch Box" },
+      { name: "description", content: "Sign in to Watch Box to build your watchlist, favorites, and continue watching." },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -35,6 +36,7 @@ function AuthPage() {
   const search = Route.useSearch();
   const nav = useNavigate();
   const { session, loading } = useAuth();
+  const appName = useAppName();
   const [mode, setMode] = useState<Search["mode"]>(search.mode ?? "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -95,7 +97,7 @@ function AuthPage() {
           transition={{ duration: 0.4 }}
           className="rounded-3xl border border-white/5 glass p-8 shadow-[var(--shadow-elevated)]"
         >
-          <p className="text-xs uppercase tracking-[0.25em] text-brand">Lumen</p>
+          <p className="text-xs uppercase tracking-[0.25em] text-brand">{appName}</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">
             {mode === "signin" ? "Welcome back" : mode === "signup" ? "Create your account" : "Reset your password"}
           </h1>
@@ -152,7 +154,7 @@ function AuthPage() {
         </motion.div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          By continuing you agree to Lumen's <Link to="/" className="underline">terms</Link>.
+          By continuing you agree to {appName}'s <Link to="/" className="underline">terms</Link>.
         </p>
       </div>
     </AppShell>

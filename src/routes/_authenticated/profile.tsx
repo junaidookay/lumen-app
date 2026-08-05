@@ -10,14 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getProfile, updateProfile } from "@/services/library";
 import { useAuth } from "@/hooks/use-auth";
+import { useAppName } from "@/hooks/use-app-name";
 
 export const Route = createFileRoute("/_authenticated/profile")({
-  head: () => ({ meta: [{ title: "Profile — Lumen" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Profile — Watch Box" }, { name: "robots", content: "noindex" }] }),
   component: Page,
 });
 
 function Page() {
   const { user } = useAuth();
+  const appName = useAppName();
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["profile", user?.id], queryFn: () => getProfile(user!.id), enabled: !!user });
   const [displayName, setDisplayName] = useState("");
@@ -47,7 +49,7 @@ function Page() {
         <header className="mb-8">
           <p className="text-xs uppercase tracking-[0.25em] text-brand">Account</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">Profile</h1>
-          <p className="mt-2 text-sm text-muted-foreground">How you appear across Lumen.</p>
+          <p className="mt-2 text-sm text-muted-foreground">How you appear across {appName}.</p>
         </header>
         <form onSubmit={onSave} className="space-y-6 rounded-3xl border border-white/5 glass p-8">
           <div className="flex items-center gap-4">

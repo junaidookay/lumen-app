@@ -16,9 +16,9 @@ import type { CatalogueFilters } from "@/services/media";
 export const Route = createFileRoute("/discover")({
   head: () => ({
     meta: [
-      { title: "Discover — Lumen" },
+      { title: "Discover — Watch Box" },
       { name: "description", content: "Explore genres, curated collections, trending titles and editorial picks." },
-      { property: "og:title", content: "Discover — Lumen" },
+      { property: "og:title", content: "Discover — Watch Box" },
       { property: "og:description", content: "Explore genres, curated collections, trending titles and editorial picks." },
     ],
   }),
