@@ -4,7 +4,7 @@
  */
 import { getEnv } from "@/env";
 
-const PAWAPAY_BASE = "https://api.pawapay.com/v1";
+const PAWAPAY_BASE = "https://api.pawapay.io/v1";
 
 export interface PawaPayConfig {
   apiKey: string;
@@ -92,7 +92,7 @@ export interface PawaPayWebhookPayload {
 
 export async function initiatePawaPayPayment(req: InitiatePaymentRequest): Promise<PawaPayPayment> {
   const { environment } = getConfig();
-  const baseUrl = environment === "production" ? "https://api.pawapay.com" : "https://sandbox.pawapay.com";
+  const baseUrl = environment === "production" ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
   const url = `${baseUrl}/v1/payments`;
 
   console.log(`[pawapay] Initiating payment: ${req.paymentReference} for ${req.amount} ${req.currency}`);
@@ -129,7 +129,7 @@ export async function initiatePawaPayPayment(req: InitiatePaymentRequest): Promi
 
 export async function checkPawaPayPayment(paymentId: string): Promise<PawaPayPayment> {
   const { environment } = getConfig();
-  const baseUrl = environment === "production" ? "https://api.pawapay.com" : "https://sandbox.pawapay.com";
+  const baseUrl = environment === "production" ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
   const url = `${baseUrl}/v1/payments/${paymentId}`;
 
   const response = await fetch(url, { headers: headers() });
