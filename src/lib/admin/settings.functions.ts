@@ -3,10 +3,12 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 async function ensureAdmin(supabase: any, userId: string) {
-  const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  // Check user_roles via admin client (bypasses RLS)
+  const { data } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId);
   const roles = (data ?? []).map((r: any) => r.role as string);
   if (roles.includes("admin")) return roles;
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  // Also check profiles.is_admin as fallback
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("is_admin")

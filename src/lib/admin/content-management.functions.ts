@@ -12,25 +12,21 @@ import { buildTvEpisodesFromTorrentInfo } from "../debrid/episode-parser";
 // ---- helpers ----
 
 async function ensureAdmin(supabase: any, userId: string) {
-  const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  // Check user_roles via admin client (bypasses RLS)
+  const { data, error } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId);
   if (error) throw new Error("Failed to resolve permissions");
   const roles = (data ?? []).map((r: any) => r.role as string);
   let ok = roles.includes("admin");
   if (!ok) {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", userId)
-      .maybeSingle();
+    // Also check profiles.is_admin as fallback
+    const { data: profile } = await supabaseAdmin.from("profiles").select("is_admin").eq("id", userId).maybeSingle();
     if (profile?.is_admin) {
       ok = true;
-      await supabaseAdmin
-        .from("user_roles")
-        .upsert(
-          { user_id: userId, role: "admin", granted_by: userId },
-          { onConflict: "user_id,role" },
-        );
+      await supabaseAdmin.from("user_roles").upsert(
+        { user_id: userId, role: "admin", granted_by: userId },
+        { onConflict: "user_id,role" },
+      );
     }
   }
   if (!ok) throw new Error("Forbidden");
