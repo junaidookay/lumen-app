@@ -45,7 +45,7 @@ export function MediaRow({ row, variant = "poster", className, onSelect }: Media
 
   return (
     <section className={cn("group/rail relative", className)} aria-label={row.title}>
-      <div className="mb-4 flex items-end justify-between gap-4 px-4 sm:px-6 lg:px-10">
+      <div className="mb-4 flex items-end justify-between gap-4 px-6 sm:px-8 lg:px-10">
         <div>
           <motion.h2
             initial={{ opacity: 0, y: 8 }}
@@ -86,7 +86,7 @@ export function MediaRow({ row, variant = "poster", className, onSelect }: Media
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-5 pb-4 sm:px-6 lg:px-10"
+        className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-6 sm:px-8 lg:px-10 pb-4"
       >
         {row.items.map((item, i) => (
           <div key={item.id + i} className="snap-start">
