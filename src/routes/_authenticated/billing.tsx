@@ -29,12 +29,12 @@ function formatMoney(cents: number, currency: string) {
 }
 
 const PAWAPAY_COUNTRIES = [
-  { code: "UG", currency: "UGX", label: "Uganda", phone: "+256" },
-  { code: "TZ", currency: "TZS", label: "Tanzania", phone: "+255" },
-  { code: "NG", currency: "NGN", label: "Nigeria", phone: "+234" },
-  { code: "KE", currency: "KES", label: "Kenya", phone: "+254" },
-  { code: "BI", currency: "BIF", label: "Burundi", phone: "+257" },
-  { code: "RW", currency: "RWF", label: "Rwanda", phone: "+250" },
+  { code: "UG", currency: "UGX", label: "Uganda", phone: "256" },
+  { code: "TZ", currency: "TZS", label: "Tanzania", phone: "255" },
+  { code: "NG", currency: "NGN", label: "Nigeria", phone: "234" },
+  { code: "KE", currency: "KES", label: "Kenya", phone: "254" },
+  { code: "BI", currency: "BIF", label: "Burundi", phone: "257" },
+  { code: "RW", currency: "RWF", label: "Rwanda", phone: "250" },
 ];
 
 function BillingPage() {
@@ -90,7 +90,8 @@ function BillingPage() {
     if (!phone) { toast.error("Enter your mobile number"); return; }
     setPawaPayBusy(true);
     try {
-      const res = await initiatePawaPayCheckout({ data: { country: selectedCountry.code, msisdn: phone } });
+      const msisdn = selectedCountry.phone + phone.replace(/\s/g, "");
+      const res = await initiatePawaPayCheckout({ data: { country: selectedCountry.code, msisdn } });
       toast.success(`Payment initiated. Check your phone for ${res.currency} ${res.amount} prompt.`);
       // Start polling
       setPawaPayPolling(res.paymentId);
@@ -308,7 +309,7 @@ function BillingPage() {
                     {selectedCountry.phone}
                   </span>
                   <Input
-                    placeholder="700 000 000"
+                    placeholder="7XX XXX XXX"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="flex-1"
