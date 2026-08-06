@@ -33,10 +33,9 @@ function headers(): Record<string, string> {
 // ---- Country config with provider mapping ----
 export const PAWAPAY_COUNTRIES = [
   { code: "UG", currency: "UGX", label: "Uganda", provider: "MTN_MOMO_UGA" },
-  { code: "TZ", currency: "TZS", label: "Tanzania", provider: "MTN_MOMO_TZA" },
+  { code: "TZ", currency: "TZS", label: "Tanzania", provider: "VODACOM_TZA" },
   { code: "NG", currency: "NGN", label: "Nigeria", provider: "MTN_MOMO_NGA" },
   { code: "KE", currency: "KES", label: "Kenya", provider: "MPESA_KEN" },
-  { code: "BI", currency: "BIF", label: "Burundi", provider: "LUMICASH_BUR" },
   { code: "RW", currency: "RWF", label: "Rwanda", provider: "MTN_MOMO_RWA" },
 ] as const;
 
@@ -100,10 +99,13 @@ export async function initiatePawaPayPayment(req: InitiatePaymentRequest): Promi
       amount: String(req.amount),
       currency: req.currency,
       payer: req.payer,
+      customerMessage: "Watch Box Premium",
     }),
   });
 
   const data = await response.json();
+
+  console.log(`[pawapay] API response:`, JSON.stringify(data));
 
   if (!response.ok || data.status === "REJECTED") {
     const failure = data.failureReason ?? {};

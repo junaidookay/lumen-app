@@ -301,6 +301,7 @@ export type Database = {
           invoice_url: string | null
           paid_at: string | null
           payment_method: string
+          provider_reference: string | null
           status: string
           stripe_invoice_id: string | null
           stripe_payment_intent_id: string | null
@@ -316,6 +317,7 @@ export type Database = {
           invoice_url?: string | null
           paid_at?: string | null
           payment_method?: string
+          provider_reference?: string | null
           status: string
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
@@ -331,6 +333,7 @@ export type Database = {
           invoice_url?: string | null
           paid_at?: string | null
           payment_method?: string
+          provider_reference?: string | null
           status?: string
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null

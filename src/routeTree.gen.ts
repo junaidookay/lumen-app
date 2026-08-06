@@ -31,6 +31,7 @@ import { Route as AuthenticatedLibraryHistoryRouteImport } from './routes/_authe
 import { Route as AuthenticatedLibraryFavoritesRouteImport } from './routes/_authenticated/library.favorites'
 import { Route as AuthenticatedLibraryContinueRouteImport } from './routes/_authenticated/library.continue'
 import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe/webhook'
+import { Route as ApiPublicPawapayWebhookRouteImport } from './routes/api/public/pawapay/webhook'
 import { Route as TvIdSeasonSeasonEpisodeEpisodeRouteImport } from './routes/tv.$id.season.$season.episode.$episode'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -146,6 +147,11 @@ const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
   path: '/api/public/stripe/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPawapayWebhookRoute = ApiPublicPawapayWebhookRouteImport.update({
+  id: '/api/public/pawapay/webhook',
+  path: '/api/public/pawapay/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TvIdSeasonSeasonEpisodeEpisodeRoute =
   TvIdSeasonSeasonEpisodeEpisodeRouteImport.update({
     id: '/season/$season/episode/$episode',
@@ -175,6 +181,7 @@ export interface FileRoutesByFullPath {
   '/library/history': typeof AuthenticatedLibraryHistoryRoute
   '/watch/$kind/$id': typeof WatchKindIdRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
+  '/api/public/pawapay/webhook': typeof ApiPublicPawapayWebhookRoute
   '/tv/$id/season/$season/episode/$episode': typeof TvIdSeasonSeasonEpisodeEpisodeRoute
 }
 export interface FileRoutesByTo {
@@ -225,6 +232,7 @@ export interface FileRoutesById {
   '/_authenticated/library/history': typeof AuthenticatedLibraryHistoryRoute
   '/watch/$kind/$id': typeof WatchKindIdRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
+  '/api/public/pawapay/webhook': typeof ApiPublicPawapayWebhookRoute
   '/tv/$id/season/$season/episode/$episode': typeof TvIdSeasonSeasonEpisodeEpisodeRoute
 }
 export interface FileRouteTypes {
@@ -251,6 +259,7 @@ export interface FileRouteTypes {
     | '/library/history'
     | '/watch/$kind/$id'
     | '/api/public/stripe/webhook'
+    | '/api/public/pawapay/webhook'
     | '/tv/$id/season/$season/episode/$episode'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -275,6 +284,7 @@ export interface FileRouteTypes {
     | '/library/history'
     | '/watch/$kind/$id'
     | '/api/public/stripe/webhook'
+    | '/api/public/pawapay/webhook'
     | '/tv/$id/season/$season/episode/$episode'
   id:
     | '__root__'
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/_authenticated/library/history'
     | '/watch/$kind/$id'
     | '/api/public/stripe/webhook'
+    | '/api/public/pawapay/webhook'
     | '/tv/$id/season/$season/episode/$episode'
   fileRoutesById: FileRoutesById
 }
@@ -317,6 +328,7 @@ export interface RootRouteChildren {
   TvIdRoute: typeof TvIdRouteWithChildren
   WatchKindIdRoute: typeof WatchKindIdRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
+  ApiPublicPawapayWebhookRoute: typeof ApiPublicPawapayWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -475,6 +487,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/pawapay/webhook': {
+      id: '/api/public/pawapay/webhook'
+      path: '/api/public/pawapay/webhook'
+      fullPath: '/api/public/pawapay/webhook'
+      preLoaderRoute: typeof ApiPublicPawapayWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tv/$id/season/$season/episode/$episode': {
       id: '/tv/$id/season/$season/episode/$episode'
       path: '/season/$season/episode/$episode'
@@ -545,6 +564,7 @@ const rootRouteChildren: RootRouteChildren = {
   TvIdRoute: TvIdRouteWithChildren,
   WatchKindIdRoute: WatchKindIdRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
+  ApiPublicPawapayWebhookRoute: ApiPublicPawapayWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

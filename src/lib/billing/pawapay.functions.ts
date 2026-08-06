@@ -46,7 +46,7 @@ export const initiatePawaPayCheckout = createServerFn({ method: "POST" })
       depositId,
     });
 
-    // Store the pending payment
+    // Store the pending payment with deposit ID for webhook matching
     await supabaseAdmin.from("payment_history").insert({
       user_id: context.userId,
       amount_cents: amount,
@@ -54,6 +54,7 @@ export const initiatePawaPayCheckout = createServerFn({ method: "POST" })
       status: "pending",
       description: `PawaPay - ${country.label} Premium`,
       payment_method: "pawapay",
+      provider_reference: depositId,
     });
 
     return {
@@ -97,14 +98,12 @@ export const checkPawaPayStatus = createServerFn({ method: "GET" })
         { onConflict: "user_id" },
       );
 
-      // Update payment history
+      // Update payment history — find by provider_reference for accuracy
       await supabaseAdmin
         .from("payment_history")
         .update({ status: "paid", paid_at: now.toISOString() })
-        .eq("user_id", context.userId)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .eq("provider_reference", data.paymentId)
+        .eq("status", "pending");
     }
 
     return { status: payment.status, paymentId: payment.paymentId };
@@ -124,14 +123,13 @@ export async function handlePawaPayWebhook(payload: PawaPayWebhookPayload): Prom
 
   console.log(`[pawapay:webhook] Deposit ${payload.depositId} status: ${payload.status}`);
 
-  // Find the pending payment by deposit ID stored in description
+  // Find the pending payment by provider_reference (depositId)
   const { data: payment } = await supabase
     .from("payment_history")
     .select("*")
+    .eq("provider_reference", payload.depositId)
     .eq("status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+    .maybeSingle();
 
   if (!payment) {
     console.warn(`[pawapay:webhook] No pending payment found for ${payload.depositId}`);

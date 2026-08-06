@@ -29,12 +29,11 @@ function formatMoney(cents: number, currency: string) {
 }
 
 const PAWAPAY_COUNTRIES = [
-  { code: "UG", currency: "UGX", label: "Uganda", phone: "256" },
-  { code: "TZ", currency: "TZS", label: "Tanzania", phone: "255" },
-  { code: "NG", currency: "NGN", label: "Nigeria", phone: "234" },
-  { code: "KE", currency: "KES", label: "Kenya", phone: "254" },
-  { code: "BI", currency: "BIF", label: "Burundi", phone: "257" },
-  { code: "RW", currency: "RWF", label: "Rwanda", phone: "250" },
+  { code: "UG", currency: "UGX", label: "Uganda", phone: "256", placeholder: "256 770 123 456" },
+  { code: "TZ", currency: "TZS", label: "Tanzania", phone: "255", placeholder: "255 612 345 678" },
+  { code: "NG", currency: "NGN", label: "Nigeria", phone: "234", placeholder: "234 803 000 0000" },
+  { code: "KE", currency: "KES", label: "Kenya", phone: "254", placeholder: "254 708 737 526" },
+  { code: "RW", currency: "RWF", label: "Rwanda", phone: "250", placeholder: "250 788 123 456" },
 ];
 
 function BillingPage() {
@@ -306,14 +305,14 @@ function BillingPage() {
                 <label className="text-sm font-medium">Mobile Number</label>
                 <div className="mt-2">
                   <Input
-                    placeholder={selectedCountry.phone + " XXX XXX XXX"}
+                    placeholder={selectedCountry.placeholder}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full"
                   />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Full number including country code. You will receive a payment prompt on your phone.
+                  Enter the number registered with your mobile money account. You will receive a payment prompt on your phone.
                 </p>
               </div>
 
