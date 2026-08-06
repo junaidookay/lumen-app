@@ -90,7 +90,7 @@ function BillingPage() {
     if (!phone) { toast.error("Enter your mobile number"); return; }
     setPawaPayBusy(true);
     try {
-      const msisdn = selectedCountry.phone + phone.replace(/\s/g, "");
+      const msisdn = phone.replace(/\s/g, "");
       const res = await initiatePawaPayCheckout({ data: { country: selectedCountry.code, msisdn } });
       toast.success(`Payment initiated. Check your phone for ${res.currency} ${res.amount} prompt.`);
       // Start polling
@@ -304,19 +304,16 @@ function BillingPage() {
 
               <div>
                 <label className="text-sm font-medium">Mobile Number</label>
-                <div className="mt-2 flex gap-2">
-                  <span className="flex items-center rounded-xl border border-white/5 bg-white/5 px-3 text-sm text-muted-foreground">
-                    {selectedCountry.phone}
-                  </span>
+                <div className="mt-2">
                   <Input
-                    placeholder="7XX XXX XXX"
+                    placeholder={selectedCountry.phone + " XXX XXX XXX"}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="flex-1"
+                    className="w-full"
                   />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  You will receive a payment prompt on your phone.
+                  Full number including country code. You will receive a payment prompt on your phone.
                 </p>
               </div>
 
