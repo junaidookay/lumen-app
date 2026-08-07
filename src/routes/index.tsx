@@ -62,17 +62,20 @@ const FAQ = [
 function Landing() {
   const { data: home } = useSuspenseQuery(homeQuery());
 
-  const findRow = (id: string) => home.rows.find((r) => r.id === id);
+  const findRow = (id: string, title: string, subtitle?: string) => {
+    const row = home.rows.find((r) => r.id === id);
+    return row ?? { id, title, subtitle, items: [] };
+  };
 
   const sections = [
-    findRow("trending"),
-    findRow("popular_movies"),
-    findRow("popular_tv"),
-    findRow("top_rated"),
-    findRow("coming_soon"),
-    findRow("in_theaters"),
-    findRow("on_the_air"),
-  ].filter((r): r is NonNullable<typeof r> => !!r && r.items.length > 0);
+    findRow("trending", "Trending Now", "What the world is watching this week"),
+    findRow("popular_movies", "Popular Movies"),
+    findRow("popular_tv", "Popular Shows"),
+    findRow("top_rated", "Top Rated Movies"),
+    findRow("coming_soon", "Coming Soon"),
+    findRow("in_theaters", "In Theaters Now"),
+    findRow("on_the_air", "On The Air"),
+  ];
 
   return (
     <AppShell>
@@ -105,7 +108,19 @@ function Landing() {
 
       <div className="space-y-14 py-16">
         {sections.map((row) => (
-          <MediaRow key={row.id} row={row} />
+          row.items.length > 0
+            ? <MediaRow key={row.id} row={row} />
+            : (
+              <section key={row.id} className="px-4 sm:px-6 lg:px-10">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold tracking-tight sm:text-xl">{row.title}</h2>
+                  {row.subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{row.subtitle}</p>}
+                </div>
+                <div className="rounded-3xl border border-white/5 glass p-8 text-center text-sm text-muted-foreground">
+                  Nothing here yet. Pin items to "{row.title}" from the admin Content tab.
+                </div>
+              </section>
+            )
         ))}
 
         {/* Genres */}
