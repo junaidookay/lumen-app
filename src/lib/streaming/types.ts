@@ -74,6 +74,8 @@ export interface StreamResolution {
   preferred: StreamingSource | null;
   /** All providers that were queried, useful for diagnostics. */
   providers: string[];
+  /** Errors from providers (e.g. RD torrent expired). */
+  errors?: string[];
 }
 
 export interface PlaybackPreferences {

@@ -6,7 +6,12 @@ import type { StreamRequest, StreamingSource } from "../types";
 import type { StreamingProvider } from "./registry";
 import { resolveStream } from "../../debrid/resolve-stream";
 
-async function resolveRdSources(req: StreamRequest): Promise<StreamingSource[]> {
+export interface RdProviderResult {
+  sources: StreamingSource[];
+  error?: string;
+}
+
+async function resolveRdSources(req: StreamRequest): Promise<RdProviderResult> {
   try {
     // Fetch content metadata from Supabase
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -16,7 +21,7 @@ async function resolveRdSources(req: StreamRequest): Promise<StreamingSource[]> 
       .eq("id", req.mediaId)
       .single();
 
-    if (!content) return [];
+    if (!content) return { sources: [], error: "Content not found in database" };
 
     // Check season-level RD data first (for per-season magnets)
     let rdTorrentId = content.rd_torrent_id;
@@ -39,7 +44,9 @@ async function resolveRdSources(req: StreamRequest): Promise<StreamingSource[]> 
     }
 
     // If no RD torrent and no stored URL, return empty
-    if (!rdTorrentId && !content.video_url) return [];
+    if (!rdTorrentId && !content.video_url) {
+      return { sources: [], error: "No Real Debrid magnet attached. Add one from the admin dashboard." };
+    }
 
     // Resolve via RD
     const result = await resolveStream({
@@ -55,7 +62,9 @@ async function resolveRdSources(req: StreamRequest): Promise<StreamingSource[]> 
       },
     });
 
-    if ("error" in result) return [];
+    if ("error" in result) {
+      return { sources: [], error: result.error };
+    }
 
     // Determine container from URL
     const url = result.stream_url;
@@ -64,33 +73,42 @@ async function resolveRdSources(req: StreamRequest): Promise<StreamingSource[]> 
     else if (url.includes(".mpd")) container = "dash";
     else if (url.includes(".webm")) container = "webm";
 
-    return [
-      {
-        id: `rd-${content.id}`,
-        provider: "Real Debrid",
-        providerId: "realdebrid",
-        label: `${content.title} (RD)`,
-        language: "en",
-        container,
-        codec: "unknown",
-        url,
-        qualities: [
-          { id: "auto", label: "Auto" },
-        ],
-        subtitles: [],
-        audioTracks: [],
-        default: true,
-        health: "healthy",
-      },
-    ];
+    return {
+      sources: [
+        {
+          id: `rd-${content.id}`,
+          provider: "Real Debrid",
+          providerId: "realdebrid",
+          label: `${content.title} (RD)`,
+          language: "en",
+          container,
+          codec: "unknown",
+          url,
+          qualities: [{ id: "auto", label: "Auto" }],
+          subtitles: [],
+          audioTracks: [],
+          default: true,
+          health: "healthy",
+        },
+      ],
+    };
   } catch (e) {
-    console.error("[rd-provider] Error:", e);
-    return [];
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[rd-provider] Error:", msg);
+    return { sources: [], error: `RD error: ${msg}` };
   }
 }
 
 export const realDebridProvider: StreamingProvider = {
   id: "realdebrid",
   name: "Real Debrid",
-  list: resolveRdSources,
+  list: async (req) => {
+    const result = await resolveRdSources(req);
+    // Attach error to sources for propagation
+    if (result.error && result.sources.length === 0) {
+      // Store error as a marker — repository will pick it up
+      (result as any)._error = result.error;
+    }
+    return result.sources;
+  },
 };

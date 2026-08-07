@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
-import { ChevronLeft } from "lucide-react";
+import { AlertTriangle, ChevronLeft, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { VideoPlayer } from "@/components/player/VideoPlayer";
 import { SeasonSelector } from "@/components/tv/SeasonSelector";
@@ -12,6 +12,7 @@ import { movieQuery, showQuery, seasonQuery, getResolvedSeasons } from "@/servic
 import { getPlaybackSources, DEFAULT_PREFS } from "@/lib/streaming/service";
 import type { PlaybackPreferences } from "@/lib/streaming/types";
 import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
 import {
   listContinueWatching,
   upsertContinueWatching,
@@ -47,6 +48,7 @@ function WatchPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const { user } = useAuth();
+  const qc = useQueryClient();
   const isTV = kind === "tv";
   const movieData = useQuery({ ...movieQuery(id), enabled: !isTV });
   const tvData = useQuery({ ...showQuery(id), enabled: isTV });
@@ -82,11 +84,15 @@ function WatchPage() {
     }),
     [kind, id, isTV, search.season, search.episode],
   );
-  const { data: sourcesData } = useQuery({
+  const { data: sourcesData, refetch: refetchSources, isFetching: isResolving } = useQuery({
     queryKey: ["playback-sources", sourceReq, prefs.preferredProvider, prefs.preferredSourceId],
     queryFn: () => getPlaybackSources({ data: { req: sourceReq, prefs } }),
     staleTime: 5 * 60 * 1000,
   });
+
+  const rdErrors = sourcesData?.errors ?? [];
+  const hasSources = (sourcesData?.sources.length ?? 0) > 0;
+  const onlySample = hasSources && sourcesData!.sources.every((s) => s.providerId === "sample");
 
   // Resume position from continue_watching
   const { data: continueRows } = useQuery({
@@ -239,40 +245,64 @@ function WatchPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            {sourcesData && sourcesData.sources.length > 0 ? (
-              <VideoPlayer
-                mediaId={item.id}
-                mediaKind={item.kind}
-                season={isTV ? search.season : undefined}
-                episode={isTV ? search.episode : undefined}
-                title={item.title}
-                subtitle={
-                  currentEp
-                    ? `S${currentEp.seasonNumber}E${currentEp.episodeNumber} · ${currentEp.title}`
-                    : item.tagline
-                }
-                poster={currentEp?.still ?? item.backdrop}
-                sources={sourcesData.sources}
-                resumeSeconds={resumeSeconds}
-                preferences={prefs}
-                onPreferenceChange={handlePreferenceChange}
-                onProgress={handleProgress}
-                onPrev={
-                  currentEp && currentEp.episodeNumber > 1
-                    ? () => goEpisode(currentEp.episodeNumber - 1)
-                    : undefined
-                }
-                onNext={upNext ? () => goEpisode(upNext.episodeNumber) : undefined}
-                upNext={
-                  upNext
-                    ? {
-                        title: upNext.title,
-                        still: upNext.still,
-                        onPlay: () => goEpisode(upNext.episodeNumber),
-                      }
-                    : undefined
-                }
-              />
+            {hasSources ? (
+              onlySample && rdErrors.length > 0 ? (
+                <div className="aspect-video w-full rounded-3xl border border-white/10 bg-surface flex flex-col items-center justify-center gap-4 p-8 text-center">
+                  <AlertTriangle className="h-12 w-12 text-amber-400" />
+                  <div>
+                    <h3 className="text-lg font-semibold">No playable source found</h3>
+                    <p className="mt-1 text-sm text-muted-foreground max-w-md">
+                      {rdErrors[0] ?? "The Real Debrid source could not be resolved. Try re-resolving the magnet from the admin dashboard."}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      qc.invalidateQueries({ queryKey: ["playback-sources"] });
+                      refetchSources();
+                    }}
+                    disabled={isResolving}
+                    variant="outline"
+                    className="rounded-full"
+                  >
+                    <RefreshCw className={`mr-2 h-4 w-4 ${isResolving ? "animate-spin" : ""}`} />
+                    {isResolving ? "Resolving..." : "Try again"}
+                  </Button>
+                </div>
+              ) : (
+                <VideoPlayer
+                  mediaId={item.id}
+                  mediaKind={item.kind}
+                  season={isTV ? search.season : undefined}
+                  episode={isTV ? search.episode : undefined}
+                  title={item.title}
+                  subtitle={
+                    currentEp
+                      ? `S${currentEp.seasonNumber}E${currentEp.episodeNumber} · ${currentEp.title}`
+                      : item.tagline
+                  }
+                  poster={currentEp?.still ?? item.backdrop}
+                  sources={sourcesData!.sources}
+                  resumeSeconds={resumeSeconds}
+                  preferences={prefs}
+                  onPreferenceChange={handlePreferenceChange}
+                  onProgress={handleProgress}
+                  onPrev={
+                    currentEp && currentEp.episodeNumber > 1
+                      ? () => goEpisode(currentEp.episodeNumber - 1)
+                      : undefined
+                  }
+                  onNext={upNext ? () => goEpisode(upNext.episodeNumber) : undefined}
+                  upNext={
+                    upNext
+                      ? {
+                          title: upNext.title,
+                          still: upNext.still,
+                          onPlay: () => goEpisode(upNext.episodeNumber),
+                        }
+                      : undefined
+                  }
+                />
+              )
             ) : (
               <div className="aspect-video w-full animate-pulse rounded-3xl bg-white/5" />
             )}
@@ -301,13 +331,13 @@ function WatchPage() {
           </motion.div>
 
           <aside className="space-y-6">
-            {upNext && (
+            {isTV && upNext && (
               <section>
                 <p className="mb-2 text-xs uppercase tracking-[0.2em] text-brand">Up next</p>
                 <EpisodeCard episode={upNext} />
               </section>
             )}
-            {season && (
+            {isTV && season && (
               <section>
                 <p className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
                   Episodes · Season {activeSeason}
@@ -315,6 +345,52 @@ function WatchPage() {
                 <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
                   {season.episodes.map((e: any, i: number) => (
                     <EpisodeCard key={e.id} episode={e} index={i} />
+                  ))}
+                </div>
+              </section>
+            )}
+            {!isTV && similar.length > 0 && (
+              <section>
+                <p className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">Similar titles</p>
+                <div className="space-y-3">
+                  {similar.slice(0, 5).map((s) => (
+                    <Link
+                      key={s.id}
+                      to="/movie/$id"
+                      params={{ id: s.id }}
+                      className="flex items-center gap-3 rounded-xl border border-white/5 bg-surface/50 p-2 transition hover:bg-surface"
+                    >
+                      {s.poster && (
+                        <img src={s.poster} alt="" className="h-16 w-11 rounded object-cover" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="line-clamp-1 text-sm font-medium">{s.title}</p>
+                        <p className="text-xs text-muted-foreground">{s.releaseDate ? new Date(s.releaseDate).getFullYear() : ""}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+            {!isTV && recs.length > 0 && (
+              <section>
+                <p className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">Recommended</p>
+                <div className="space-y-3">
+                  {recs.slice(0, 5).map((r) => (
+                    <Link
+                      key={r.id}
+                      to="/movie/$id"
+                      params={{ id: r.id }}
+                      className="flex items-center gap-3 rounded-xl border border-white/5 bg-surface/50 p-2 transition hover:bg-surface"
+                    >
+                      {r.poster && (
+                        <img src={r.poster} alt="" className="h-16 w-11 rounded object-cover" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="line-clamp-1 text-sm font-medium">{r.title}</p>
+                        <p className="text-xs text-muted-foreground">{r.releaseDate ? new Date(r.releaseDate).getFullYear() : ""}</p>
+                      </div>
+                    </Link>
                   ))}
                 </div>
               </section>

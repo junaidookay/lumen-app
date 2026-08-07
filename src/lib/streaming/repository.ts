@@ -19,13 +19,22 @@ export async function resolveSources(
   const providers = listProviders();
   const results = await Promise.allSettled(providers.map((p) => p.list(req)));
   const sources: StreamingSource[] = [];
+  const errors: string[] = [];
   for (const r of results) {
-    if (r.status === "fulfilled") sources.push(...r.value);
+    if (r.status === "fulfilled") {
+      sources.push(...r.value);
+      // Check for attached error marker from RD provider
+      const marked = r.value as any;
+      if (marked._error) errors.push(marked._error);
+    } else {
+      errors.push(`Provider failed: ${r.reason}`);
+    }
   }
   sources.sort((a, b) => score(b, prefs) - score(a, prefs));
   return {
     sources,
     preferred: sources[0] ?? null,
     providers: providers.map((p) => p.id),
+    errors: errors.length > 0 ? errors : undefined,
   };
 }
