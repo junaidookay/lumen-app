@@ -246,13 +246,13 @@ function WatchPage() {
             transition={{ duration: 0.5 }}
           >
             {hasSources ? (
-              onlySample && rdErrors.length > 0 ? (
+              onlySample ? (
                 <div className="aspect-video w-full rounded-3xl border border-white/10 bg-surface flex flex-col items-center justify-center gap-4 p-8 text-center">
                   <AlertTriangle className="h-12 w-12 text-amber-400" />
                   <div>
                     <h3 className="text-lg font-semibold">No playable source found</h3>
                     <p className="mt-1 text-sm text-muted-foreground max-w-md">
-                      {rdErrors[0] ?? "The Real Debrid source could not be resolved. Try re-resolving the magnet from the admin dashboard."}
+                      {rdErrors[0] ?? "No Real Debrid source available. The torrent may need to be re-resolved from the admin dashboard."}
                     </p>
                   </div>
                   <Button

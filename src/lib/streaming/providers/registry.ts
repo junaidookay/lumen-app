@@ -1,5 +1,4 @@
 import type { StreamRequest, StreamingSource } from "../types";
-import { sampleProvider } from "./sample";
 import { realDebridProvider } from "./realdebrid";
 import { embedFallbackProvider } from "./embed-fallback";
 
@@ -10,12 +9,12 @@ export interface StreamingProvider {
 }
 
 /**
- * Provider registry. Providers are tried in order — RD first, then embeds, then sample.
+ * Provider registry — RD first, then embed fallbacks.
+ * Sample provider removed: it was masking real playback errors.
  */
 const providers: StreamingProvider[] = [
   realDebridProvider,
   embedFallbackProvider,
-  sampleProvider,
 ];
 
 export function listProviders(): StreamingProvider[] {
