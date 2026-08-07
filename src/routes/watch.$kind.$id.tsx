@@ -132,7 +132,7 @@ function WatchPage() {
     const nums = new Set<number>(resolvedSeasonRows?.map((s: any) => s.season_number) ?? []);
     // Also check title-level episodes (from raw DB, not mapped MediaItem)
     const rawItem = item as any;
-    if (rawItem.episodes) {
+    if (rawItem?.episodes) {
       for (const ep of rawItem.episodes as any[]) nums.add(ep.season);
     }
     return nums;
