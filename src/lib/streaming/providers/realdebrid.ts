@@ -209,17 +209,7 @@ export const realDebridProvider: StreamingProvider = {
         if (downloadId) {
           const transcoded = await getTranscodedUrl(downloadId, req.clientIp);
           console.log("[rd-provider] Transcoded URL:", transcoded?.substring(0, 120) ?? "null");
-          if (transcoded) {
-            // DASH URLs fetched server-side have segments IP-locked to our server.
-            // Route through our proxy so the browser can fetch segments.
-            if (transcoded.includes(".mpd") || transcoded.includes("/dash")) {
-              const proxyUrl = `/api/dash-proxy?url=${encodeURIComponent(transcoded)}`;
-              console.log("[rd-provider] DASH proxied:", proxyUrl.substring(0, 120));
-              streamUrl = proxyUrl;
-            } else {
-              streamUrl = transcoded;
-            }
-          }
+          if (transcoded) streamUrl = transcoded;
         }
       } else {
         console.log("[rd-provider] Using direct URL (native playback)");
