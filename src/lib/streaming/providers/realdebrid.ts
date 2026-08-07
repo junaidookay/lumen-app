@@ -174,24 +174,24 @@ export const realDebridProvider: StreamingProvider = {
       let streamUrl = unrestricted.download;
       const filename = torrentInfo.files?.[linkIndex]?.path ?? "";
       console.log("[rd-provider] Filename:", filename);
-      console.log("[rd-provider] Unrestricted URL:", streamUrl.substring(0, 80) + "...");
       console.log("[rd-provider] Streamable:", unrestricted.streamable);
 
-      // Try transcoding for non-H264 content (MKV, HEVC, etc.)
-      const isH264Mp4 = /(\.mp4|\.m4v)/.test(filename) && /(x264|h264|avc|bluray)/i.test(filename);
-      console.log("[rd-provider] isH264Mp4:", isH264Mp4);
-      if (!isH264Mp4 && unrestricted.streamable === 1) {
+      // MP4/M4V files play natively in browser — no transcoding needed
+      const isNativeMp4 = /\.(mp4|m4v)$/i.test(filename);
+      // MKV/HEVC/AVI need transcoding to play in browser
+      const needsTranscoding = !isNativeMp4 && /\.(mkv|avi|wmv|flv|mov)$/i.test(filename);
+
+      if (needsTranscoding && unrestricted.streamable === 1) {
+        console.log("[rd-provider] File needs transcoding, attempting...");
         const downloadId = await findDownloadId(restrictedLink);
-        console.log("[rd-provider] Download ID for transcode:", downloadId);
+        console.log("[rd-provider] Download ID:", downloadId);
         if (downloadId) {
           const transcoded = await getTranscodedUrl(downloadId);
           console.log("[rd-provider] Transcoded URL:", transcoded?.substring(0, 80) ?? "null");
-          if (transcoded) {
-            streamUrl = transcoded;
-          }
+          if (transcoded) streamUrl = transcoded;
         }
-      } else if (!isH264Mp4 && unrestricted.streamable !== 1) {
-        console.log("[rd-provider] File is not H264 and not streamable — may not play in browser");
+      } else {
+        console.log("[rd-provider] Using direct URL (native playback)");
       }
 
       return [makeSource(content, streamUrl, filename)];
