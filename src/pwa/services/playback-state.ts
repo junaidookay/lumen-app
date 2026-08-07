@@ -1,4 +1,4 @@
-const STORAGE_KEY = "lumen-playback-state";
+const STORAGE_KEY = "watchbox-playback-state";
 
 interface PlaybackState {
   mediaId: string;

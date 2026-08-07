@@ -34,9 +34,9 @@ describe("cache", () => {
   describe("getUserCacheNames", () => {
     it("returns correctly versioned cache names", () => {
       const names = getUserCacheNames(userId);
-      expect(names.api).toBe(`lumen-auth-api-${userId}-${CACHE_VERSION}`);
+      expect(names.api).toBe(`watchbox-auth-api-${userId}-${CACHE_VERSION}`);
       expect(names.library).toBe(
-        `lumen-auth-library-${userId}-${CACHE_VERSION}`,
+        `watchbox-auth-library-${userId}-${CACHE_VERSION}`,
       );
     });
   });
@@ -48,8 +48,8 @@ describe("cache", () => {
       // This is by design: the legacy list identifies OLD cache names to clean up.
       const keysToDelete = [...LEGACY_CACHES];
       const keysToKeep = [
-        `lumen-auth-api-${userId}-${CACHE_VERSION}`,
-        `lumen-auth-library-${userId}-${CACHE_VERSION}`,
+        `watchbox-auth-api-${userId}-${CACHE_VERSION}`,
+        `watchbox-auth-library-${userId}-${CACHE_VERSION}`,
       ];
 
       vi.stubGlobal("caches", {
@@ -79,10 +79,10 @@ describe("cache", () => {
       await clearUserCaches(userId);
 
       expect(deleteFn).toHaveBeenCalledWith(
-        `lumen-auth-api-${userId}-${CACHE_VERSION}`,
+        `watchbox-auth-api-${userId}-${CACHE_VERSION}`,
       );
       expect(deleteFn).toHaveBeenCalledWith(
-        `lumen-auth-library-${userId}-${CACHE_VERSION}`,
+        `watchbox-auth-library-${userId}-${CACHE_VERSION}`,
       );
     });
   });

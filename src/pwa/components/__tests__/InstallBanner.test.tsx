@@ -9,6 +9,10 @@ vi.mock("@/pwa/hooks/use-install", () => ({
   useInstall: () => mockUseInstall(),
 }));
 
+vi.mock("@/hooks/use-app-name", () => ({
+  useAppName: () => "Watch Box",
+}));
+
 describe("InstallBanner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,7 +72,7 @@ describe("InstallBanner", () => {
     });
 
     render(<InstallBanner />);
-    expect(screen.getByText("Install Lumen")).toBeInTheDocument();
+    expect(screen.getByText("Install Watch Box")).toBeInTheDocument();
     expect(screen.getByText("Add to your home screen for quick access")).toBeInTheDocument();
   });
 

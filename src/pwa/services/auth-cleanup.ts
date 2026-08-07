@@ -14,7 +14,7 @@ export async function cleanupOnLogout(userId: string): Promise<void> {
   try {
     const keys = Object.keys(localStorage);
     for (const key of keys) {
-      if (key.startsWith("lumen-") && key.includes(userId)) {
+      if ((key.startsWith("watchbox-") || key.startsWith("lumen-")) && key.includes(userId)) {
         localStorage.removeItem(key);
       }
     }

@@ -7,7 +7,7 @@ import { trackInstallEvent } from "@/pwa/services/install-analytics";
 import { useAppName } from "@/hooks/use-app-name";
 import { cn } from "@/lib/utils";
 
-const STORAGE_KEY = "lumen-install-reminder";
+const STORAGE_KEY = "watchbox-install-reminder";
 const DISMISS_KEY = "pwa-install-dismissed";
 
 interface ReminderState {

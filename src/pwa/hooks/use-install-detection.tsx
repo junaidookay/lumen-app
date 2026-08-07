@@ -14,7 +14,7 @@ export function useInstallDetection() {
         (window.navigator as unknown as Record<string, boolean>).standalone === true;
 
       if (standalone) {
-        const state = localStorage.getItem("lumen-install-reminder");
+        const state = localStorage.getItem("watchbox-install-reminder");
         const parsed = state ? JSON.parse(state) : {};
         if (!parsed.installed) {
           markInstalled();

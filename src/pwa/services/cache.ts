@@ -11,7 +11,7 @@ export async function cleanupOldCaches(): Promise<void> {
   if (typeof caches === "undefined") return;
 
   const keys = await caches.keys();
-  const validPrefixes = ["lumen-public-", "lumen-auth-", "lumen-offline-"];
+  const validPrefixes = ["watchbox-public-", "watchbox-auth-", "watchbox-offline-", "lumen-public-", "lumen-auth-", "lumen-offline-"];
 
   await Promise.all(
     keys

@@ -36,7 +36,7 @@ export default defineConfig({
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: "CacheFirst",
             options: {
-              cacheName: "lumen-google-fonts",
+              cacheName: "watchbox-google-fonts",
               expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
             },
@@ -45,7 +45,7 @@ export default defineConfig({
             urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
             handler: "CacheFirst",
             options: {
-              cacheName: "lumen-gstatic-fonts",
+              cacheName: "watchbox-gstatic-fonts",
               expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
             },
@@ -54,7 +54,7 @@ export default defineConfig({
             urlPattern: /^https:\/\/image\.tmdb\.org\/.*/i,
             handler: "StaleWhileRevalidate",
             options: {
-              cacheName: "lumen-tmdb-images",
+              cacheName: "watchbox-tmdb-images",
               expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
               cacheableResponse: { statuses: [0, 200] },
             },
@@ -63,7 +63,7 @@ export default defineConfig({
             urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/.*/i,
             handler: "NetworkFirst",
             options: {
-              cacheName: "lumen-supabase-api-v1",
+              cacheName: "watchbox-supabase-api-v1",
               expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
               cacheableResponse: { statuses: [0, 200] },
               networkTimeoutSeconds: 5,

@@ -1,6 +1,6 @@
 {
-  "name": "Lumen",
-  "short_name": "Lumen",
+  "name": "Watch Box",
+  "short_name": "Watch Box",
   "description": "A premium streaming experience for movies and TV — curated collections, cinematic recommendations, and a beautifully quiet interface.",
   "start_url": "/",
   "display": "standalone",
@@ -29,9 +29,9 @@
   ],
   "shortcuts": [
     {
-      "name": "Browse",
-      "url": "/home",
-      "description": "Browse movies and TV shows"
+      "name": "Home",
+      "url": "/",
+      "description": "Browse featured content"
     },
     {
       "name": "Discover",
@@ -42,6 +42,11 @@
       "name": "Search",
       "url": "/search",
       "description": "Search for movies and TV shows"
+    },
+    {
+      "name": "Library",
+      "url": "/library",
+      "description": "Your watchlist and history"
     }
   ]
 }

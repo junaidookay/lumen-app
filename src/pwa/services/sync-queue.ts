@@ -1,6 +1,6 @@
 import type { OfflineQueueItem } from "@/pwa/types";
 
-const DB_NAME = "lumen-offline-queue";
+const DB_NAME = "watchbox-offline-queue";
 const DB_VERSION = 1;
 const STORE_NAME = "pending-writes";
 
