@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Info, Play, Star } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import type { MediaItem } from "@/types/media";
 import { Button } from "@/components/ui/button";
 
@@ -78,11 +79,15 @@ export function HeroCarousel({ items, interval = 7000 }: HeroCarouselProps) {
                 {active.overview}
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Button size="lg" className="rounded-full shadow-[var(--shadow-glow)]">
-                  <Play className="mr-2 h-4 w-4 fill-current" /> Play
+                <Button asChild size="lg" className="rounded-full shadow-[var(--shadow-glow)]">
+                  <Link to="/watch/$kind/$id" params={{ kind: active.kind, id: active.id }} search={{ season: 1, episode: 1 }}>
+                    <Play className="mr-2 h-4 w-4 fill-current" /> Play
+                  </Link>
                 </Button>
-                <Button size="lg" variant="secondary" className="rounded-full glass border border-white/10 hover:bg-white/10">
-                  <Info className="mr-2 h-4 w-4" /> More info
+                <Button asChild size="lg" variant="secondary" className="rounded-full glass border border-white/10 hover:bg-white/10">
+                  <Link to={active.kind === "tv" ? "/tv/$id" : "/movie/$id"} params={{ id: active.id }}>
+                    <Info className="mr-2 h-4 w-4" /> More info
+                  </Link>
                 </Button>
               </div>
             </motion.div>

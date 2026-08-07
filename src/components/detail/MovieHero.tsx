@@ -21,6 +21,10 @@ export function MovieHero({ item }: { item: MediaItem }) {
   const premium = isPremium(perms);
 
   async function handleDownload() {
+    if (!premium) {
+      toast.error("Premium subscription required for downloads");
+      return;
+    }
     setDownloading(true);
     try {
       const res = await resolveDownloadUrl({
@@ -87,18 +91,16 @@ export function MovieHero({ item }: { item: MediaItem }) {
                   <Play className="mr-2 h-4 w-4 fill-current" /> Play now
                 </Link>
               </Button>
-              {premium && (
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  onClick={handleDownload}
-                  disabled={downloading}
-                  className="rounded-full glass border border-white/10 hover:bg-white/10"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  {downloading ? "Resolving..." : "Download"}
-                </Button>
-              )}
+              <Button
+                size="lg"
+                variant="secondary"
+                onClick={handleDownload}
+                disabled={downloading}
+                className="rounded-full glass border border-white/10 hover:bg-white/10"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {downloading ? "Resolving..." : "Download"}
+              </Button>
               {item.trailers?.length ? (
                 <Button size="lg" variant="secondary" onClick={() => setTrailerOpen(true)} className="rounded-full glass border border-white/10 hover:bg-white/10">
                   Watch trailer
