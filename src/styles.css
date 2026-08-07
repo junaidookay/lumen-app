@@ -166,6 +166,15 @@
   /* Hide scrollbars on horizontal rails */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Native select / option dark theme fix */
+  select {
+    color-scheme: dark;
+  }
+  select option {
+    background-color: oklch(0.18 0.018 275);
+    color: oklch(0.97 0.01 280);
+  }
 }
 
 @utility glass {

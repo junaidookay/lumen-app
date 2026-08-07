@@ -634,7 +634,7 @@ function RealDebrid() {
         </p>
         <div className="space-y-3">
           <select
-            className="w-full h-10 px-3 rounded-lg bg-white/[0.03] border border-hairline text-sm"
+            className="w-full h-10 px-3 rounded-lg bg-surface border border-white/10 text-sm text-foreground"
             value={selectedContentId}
             onChange={(e) => {
               setSelectedContentId(e.target.value);
@@ -655,7 +655,7 @@ function RealDebrid() {
             <div className="space-y-2">
               <label className="text-xs text-muted-foreground">Save to season (optional)</label>
               <select
-                className="w-full h-9 px-3 rounded-lg bg-white/[0.03] border border-hairline text-sm"
+                className="w-full h-9 px-3 rounded-lg bg-surface border border-white/10 text-sm text-foreground"
                 value={selectedSeason ?? ""}
                 onChange={(e) => setSelectedSeason(e.target.value ? Number(e.target.value) : null)}
               >
