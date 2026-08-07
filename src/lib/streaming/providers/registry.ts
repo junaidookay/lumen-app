@@ -1,6 +1,5 @@
 import type { StreamRequest, StreamingSource } from "../types";
 import { realDebridProvider } from "./realdebrid";
-import { embedFallbackProvider } from "./embed-fallback";
 
 export interface StreamingProvider {
   id: string;
@@ -9,12 +8,11 @@ export interface StreamingProvider {
 }
 
 /**
- * Provider registry — RD first, then embed fallbacks.
- * Sample provider removed: it was masking real playback errors.
+ * Provider registry — RD only.
+ * Embed fallbacks removed: caused thousands of CORS errors and aren't needed.
  */
 const providers: StreamingProvider[] = [
   realDebridProvider,
-  embedFallbackProvider,
 ];
 
 export function listProviders(): StreamingProvider[] {
