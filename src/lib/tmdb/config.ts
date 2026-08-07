@@ -17,10 +17,10 @@ export type StillSize = (typeof STILL_SIZES)[number];
 export type ProfileSize = (typeof PROFILE_SIZES)[number];
 export type LogoSize = (typeof LOGO_SIZES)[number];
 
-/** Build a TMDB image URL. Proxied through our API to avoid CORS. Returns empty string when path is missing. */
+/** Build a TMDB image URL. Returns empty string when path is missing. */
 export function tmdbImage(path: string | null | undefined, size: string = "original"): string {
   if (!path) return "";
-  return `/api/image?path=/${size}${path}`;
+  return `https://image.tmdb.org/t/p/${size}${path}`;
 }
 
 export const poster = (p?: string | null, size: PosterSize = "w500") => tmdbImage(p, size);

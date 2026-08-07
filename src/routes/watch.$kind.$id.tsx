@@ -23,8 +23,8 @@ import {
 
 export const Route = createFileRoute("/watch/$kind/$id")({
   validateSearch: (s: Record<string, unknown>) => ({
-    season: Number(s.season ?? 1) || 1,
-    episode: Number(s.episode ?? 1) || 1,
+    season: Number(s.season) || 1,
+    episode: Number(s.episode) || 1,
   }),
   loader: async ({ params, context }) => {
     try {

@@ -42,11 +42,25 @@ export const realDebridProvider: StreamingProvider = {
   list: async (req) => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: content } = await supabaseAdmin
-        .from("media_items")
-        .select("id, kind, rd_torrent_id, rd_info_hash, rd_links, rd_selected_file, episodes, video_url, title")
-        .eq("id", req.mediaId)
-        .single();
+
+      // Query with all columns — if rd_links doesn't exist yet, fall back
+      let content: any = null;
+      try {
+        const result = await supabaseAdmin
+          .from("media_items")
+          .select("id, kind, rd_torrent_id, rd_info_hash, rd_links, rd_selected_file, episodes, video_url, title")
+          .eq("id", req.mediaId)
+          .single();
+        content = result.data;
+      } catch {
+        // rd_links column may not exist yet — query without it
+        const result = await supabaseAdmin
+          .from("media_items")
+          .select("id, kind, rd_torrent_id, rd_info_hash, episodes, video_url, title")
+          .eq("id", req.mediaId)
+          .single();
+        content = result.data;
+      }
 
       if (!content) return [];
 
@@ -56,12 +70,18 @@ export const realDebridProvider: StreamingProvider = {
 
       // For TV: check season-level rd_links first
       if (content.kind === "tv" && req.season != null) {
-        const { data: seasonRow } = await (supabaseAdmin as any)
-          .from("media_item_seasons")
-          .select("rd_links, rd_selected_file, rd_torrent_id")
-          .eq("media_item_id", req.mediaId)
-          .eq("season_number", req.season)
-          .single();
+        let seasonRow: any = null;
+        try {
+          const result = await (supabaseAdmin as any)
+            .from("media_item_seasons")
+            .select("rd_links, rd_selected_file, rd_torrent_id")
+            .eq("media_item_id", req.mediaId)
+            .eq("season_number", req.season)
+            .single();
+          seasonRow = result.data;
+        } catch {
+          // Column may not exist yet
+        }
 
         if (seasonRow?.rd_links && Array.isArray(seasonRow.rd_links) && seasonRow.rd_links.length > 0) {
           rdLinks = seasonRow.rd_links;
@@ -127,32 +147,83 @@ export const realDebridProvider: StreamingProvider = {
         ];
       }
 
-      // PATH 3: No pre-resolved data — dynamic RD resolution via server fn
-      // This is the fallback for content resolved before rd_links was added
+      // PATH 3: No pre-resolved data — inline dynamic RD resolution
+      // Fallback for content resolved before rd_links was added
       if (content.rd_torrent_id) {
-        const { resolveStream } = await import("../../debrid/resolve-stream");
-        const result = await resolveStream({
-          data: {
-            contentId: content.id,
-            kind: (content.kind || req.kind) as "movie" | "tv",
-            season: req.season,
-            episode: req.episode,
-            rdTorrentId: content.rd_torrent_id,
-            rdInfoHash: content.rd_info_hash ?? undefined,
-            episodes: (content.episodes as any[]) ?? undefined,
-          },
-        });
+        const { getTorrentInfo, unrestrictLink, getTranscodedUrl, findDownloadId } = await import("../../debrid/real-debrid");
+        const { findEpisodeLinkIndex, findFirstVideoLinkIndex } = await import("../../debrid/episode-parser");
 
-        if ("error" in result) {
-          console.error("[rd-provider] Dynamic resolve failed:", result.error);
+        let torrentInfo: any;
+        try {
+          torrentInfo = await getTorrentInfo(content.rd_torrent_id);
+        } catch {
+          // Torrent expired — try re-adding from hash
+          if (content.rd_info_hash) {
+            const { addMagnet, selectFiles } = await import("../../debrid/real-debrid");
+            try {
+              const magnet = `magnet:?xt=urn:btih:${content.rd_info_hash}`;
+              const { id } = await addMagnet(magnet);
+              await selectFiles(id);
+              await new Promise((r) => setTimeout(r, 2000));
+              torrentInfo = await getTorrentInfo(id);
+            } catch {
+              console.error("[rd-provider] Failed to re-add torrent");
+              return [];
+            }
+          } else {
+            return [];
+          }
+        }
+
+        if (torrentInfo.status !== "downloaded" || !torrentInfo.links?.length) {
+          console.error("[rd-provider] Torrent not ready:", torrentInfo.status);
           return [];
         }
 
-        const url = result.stream_url;
+        // Pick the right link index
+        let linkIndex = 0;
+        if (content.kind === "tv" && req.season != null && req.episode != null) {
+          const episodes = (content.episodes as any[]) ?? [];
+          const targetEp = episodes.find((e: any) => e.season === req.season && e.episode === req.episode);
+          if (targetEp?.rd_link_index !== undefined) {
+            linkIndex = targetEp.rd_link_index;
+          } else {
+            linkIndex = findEpisodeLinkIndex(torrentInfo, req.season, req.episode);
+          }
+          if (linkIndex >= torrentInfo.links.length) linkIndex = 0;
+        } else {
+          linkIndex = findFirstVideoLinkIndex(torrentInfo);
+        }
+
+        // Unrestrict the link
+        let clientIp: string | undefined;
+        try {
+          const { getRequest } = await import("@tanstack/react-start/server");
+          const request = getRequest();
+          clientIp = request?.headers?.get("x-forwarded-for")?.split(",")[0]?.trim()
+            ?? request?.headers?.get("x-real-ip")
+            ?? undefined;
+        } catch {}
+
+        const restrictedLink = torrentInfo.links[linkIndex];
+        const unrestricted = await unrestrictLink(restrictedLink, clientIp);
+        let streamUrl = unrestricted.download;
+
+        // Try transcoding for non-H264 content
+        const filename = torrentInfo.files?.[linkIndex]?.path ?? "";
+        const isH264Mp4 = /(\.mp4|\.m4v)/.test(filename) && /(x264|h264|avc|bluray)/i.test(filename);
+        if (!isH264Mp4 && unrestricted.streamable === 1) {
+          const downloadId = await findDownloadId(restrictedLink);
+          if (downloadId) {
+            const transcoded = await getTranscodedUrl(downloadId);
+            if (transcoded) streamUrl = transcoded;
+          }
+        }
+
         let container: "mp4" | "hls" | "dash" | "webm" = "mp4";
-        if (url.includes(".m3u8")) container = "hls";
-        else if (url.includes(".mpd")) container = "dash";
-        else if (url.includes(".webm")) container = "webm";
+        if (streamUrl.includes(".m3u8")) container = "hls";
+        else if (streamUrl.includes(".mpd")) container = "dash";
+        else if (streamUrl.includes(".webm")) container = "webm";
 
         return [
           {
@@ -163,7 +234,7 @@ export const realDebridProvider: StreamingProvider = {
             language: "en",
             container,
             codec: "unknown",
-            url,
+            url: streamUrl,
             qualities: [{ id: "auto", label: "Auto" }],
             subtitles: [],
             audioTracks: [],
