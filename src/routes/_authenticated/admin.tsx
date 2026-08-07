@@ -868,12 +868,13 @@ function Content() {
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState<string>("");
   const [editingItem, setEditingItem] = useState<any | null>(null);
-  const [editForm, setEditForm] = useState<{ title: string; overview: string; year: string; status: string; tags: string[] }>({
+  const [editForm, setEditForm] = useState<{ title: string; overview: string; year: string; status: string; tags: string[]; landing_spots: string[] }>({
     title: "",
     overview: "",
     year: "",
     status: "published",
     tags: [],
+    landing_spots: [],
   });
 
   const contentQuery = useQuery({
@@ -906,6 +907,17 @@ function Content() {
 
   const AVAILABLE_TAGS = ["featured", "trending", "new", "classic", "action", "drama", "comedy", "horror", "scifi", "romance", "documentary", "animation", "kids"];
 
+  const LANDING_SPOTS = [
+    { id: "hero", label: "Hero", desc: "Main hero carousel at top" },
+    { id: "trending", label: "Trending Now", desc: "Trending section" },
+    { id: "popular_movies", label: "Popular Movies", desc: "Popular movies row" },
+    { id: "popular_tv", label: "Popular Shows", desc: "Popular TV shows row" },
+    { id: "top_rated", label: "Top Rated", desc: "Top rated movies row" },
+    { id: "coming_soon", label: "Coming Soon", desc: "Upcoming releases row" },
+    { id: "in_theaters", label: "In Theaters", desc: "Now playing in theaters" },
+    { id: "on_the_air", label: "On The Air", desc: "Currently airing TV" },
+  ];
+
   function openEdit(item: any) {
     setEditingItem(item);
     setEditForm({
@@ -914,6 +926,7 @@ function Content() {
       year: item.year?.toString() ?? "",
       status: item.status ?? "published",
       tags: item.tags ?? [],
+      landing_spots: item.landing_spots ?? [],
     });
   }
 
@@ -921,6 +934,15 @@ function Content() {
     setEditForm((prev) => ({
       ...prev,
       tags: prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag],
+    }));
+  }
+
+  function toggleLandingSpot(spotId: string) {
+    setEditForm((prev) => ({
+      ...prev,
+      landing_spots: prev.landing_spots.includes(spotId)
+        ? prev.landing_spots.filter((s) => s !== spotId)
+        : [...prev.landing_spots, spotId],
     }));
   }
 
@@ -933,6 +955,7 @@ function Content() {
       year: editForm.year ? parseInt(editForm.year) : null,
       status: editForm.status,
       tags: editForm.tags,
+      landing_spots: editForm.landing_spots,
     });
   }
 
@@ -982,6 +1005,7 @@ function Content() {
               <th className="px-4 py-3 text-left">Year</th>
               <th className="px-4 py-3 text-left">RD</th>
               <th className="px-4 py-3 text-left">Tags</th>
+              <th className="px-4 py-3 text-left">Spots</th>
               <th className="px-4 py-3 text-left">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
@@ -1015,6 +1039,15 @@ function Content() {
                     ))}
                   </div>
                 </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {(item.landing_spots ?? []).map((spot: string) => (
+                      <span key={spot} className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                        {spot.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                </td>
                 <td className="px-4 py-3 capitalize">{item.status}</td>
                 <td className="px-4 py-3 text-right">
                   <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
@@ -1025,7 +1058,7 @@ function Content() {
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                   {contentQuery.isLoading ? "Loading..." : "No content found."}
                 </td>
               </tr>
@@ -1120,6 +1153,32 @@ function Content() {
                         }`}
                       >
                         {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Landing Spots */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Landing Page Sections</label>
+                <p className="text-xs text-muted-foreground">Pin this item to appear at the top of these sections on the landing page.</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {LANDING_SPOTS.map((spot) => {
+                    const active = editForm.landing_spots.includes(spot.id);
+                    return (
+                      <button
+                        key={spot.id}
+                        type="button"
+                        onClick={() => toggleLandingSpot(spot.id)}
+                        className={`flex flex-col items-start rounded-xl px-3 py-2 text-left text-xs transition ${
+                          active
+                            ? "border border-blue-500/50 bg-blue-500/10 text-blue-400"
+                            : "border border-white/10 text-muted-foreground hover:border-white/20 hover:text-foreground"
+                        }`}
+                      >
+                        <span className="font-medium">{spot.label}</span>
+                        <span className="text-[10px] opacity-60">{spot.desc}</span>
                       </button>
                     );
                   })}

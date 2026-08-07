@@ -210,6 +210,7 @@ export type Database = {
           episodes: Json
           id: string
           kind: string
+          landing_spots: string[] | null
           overview: string | null
           poster_path: string | null
           rd_info_hash: string | null
@@ -228,6 +229,7 @@ export type Database = {
           episodes?: Json
           id?: string
           kind: string
+          landing_spots?: string[] | null
           overview?: string | null
           poster_path?: string | null
           rd_info_hash?: string | null
@@ -246,6 +248,7 @@ export type Database = {
           episodes?: Json
           id?: string
           kind?: string
+          landing_spots?: string[] | null
           overview?: string | null
           poster_path?: string | null
           rd_info_hash?: string | null

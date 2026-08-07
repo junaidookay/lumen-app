@@ -68,7 +68,10 @@ function Landing() {
   const trendingRow = home.rows.find((r) => r.id === "trending") ?? home.rows[0];
   const popularMovies = home.rows.find((r) => r.id === "popular-movies");
   const popularTV = home.rows.find((r) => r.id === "popular-tv");
-  const topRated = discover.rows.find((r) => r.id === "top-rated-disc");
+  const topRatedMovies = home.rows.find((r) => r.id === "top-rated");
+  const comingSoon = home.rows.find((r) => r.id === "upcoming");
+  const inTheaters = home.rows.find((r) => r.id === "now-playing");
+  const onTheAir = home.rows.find((r) => r.id === "on-the-air");
   return (
     <AppShell>
       <HeroCarousel items={home.hero} />
@@ -102,7 +105,10 @@ function Landing() {
         <MediaRow row={{ id: "trending", title: "Trending Now", subtitle: "What the world is watching this week", items: trendingRow?.items ?? [] }} />
         {popularMovies && <MediaRow row={popularMovies} />}
         {popularTV && <MediaRow row={popularTV} />}
-        {topRated && <MediaRow row={topRated} />}
+        {topRatedMovies && <MediaRow row={topRatedMovies} />}
+        {comingSoon && <MediaRow row={comingSoon} />}
+        {inTheaters && <MediaRow row={inTheaters} />}
+        {onTheAir && <MediaRow row={onTheAir} />}
 
         {/* Genres */}
         <section className="px-4 sm:px-6 lg:px-10">

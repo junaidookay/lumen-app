@@ -118,8 +118,42 @@ export interface HomePayload {
 }
 
 export const getHome = createServerFn({ method: "GET" }).handler(async (): Promise<HomePayload> => {
-  const dbContent = await getLandingContent();
-  if (dbContent && dbContent.rows.length > 0) return dbContent;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  // Fetch all published content from DB with landing_spots
+  const { data: dbItems } = await supabaseAdmin
+    .from("media_items")
+    .select("id, title, kind, year, overview, poster_path, backdrop_path, tags, landing_spots")
+    .eq("status", "published")
+    .order("created_at", { ascending: false });
+
+  const pinnedBySpot = new Map<string, MediaItem[]>();
+  if (dbItems && dbItems.length > 0) {
+    for (const row of dbItems) {
+      const spots: string[] = row.landing_spots ?? [];
+      const mediaItem: MediaItem = {
+        id: row.id,
+        kind: row.kind as "movie" | "tv",
+        title: row.title ?? "Untitled",
+        poster: row.poster_path
+          ? row.poster_path.startsWith("http") ? row.poster_path : `https://image.tmdb.org/t/p/w500${row.poster_path}`
+          : "",
+        backdrop: row.backdrop_path
+          ? row.backdrop_path.startsWith("http") ? row.backdrop_path : `https://image.tmdb.org/t/p/w1280${row.backdrop_path}`
+          : "",
+        overview: row.overview ?? "",
+        genres: row.tags ?? [],
+        runtime: 0,
+        releaseDate: row.year ? `${row.year}-01-01` : "",
+        rating: 0,
+        cast: [],
+      };
+      for (const spot of spots) {
+        if (!pinnedBySpot.has(spot)) pinnedBySpot.set(spot, []);
+        pinnedBySpot.get(spot)!.push(mediaItem);
+      }
+    }
+  }
 
   const {
     trending,
@@ -144,17 +178,57 @@ export const getHome = createServerFn({ method: "GET" }).handler(async (): Promi
 
   const trendingItems = mapListItems(tr.results);
 
+  function merge(pinned: MediaItem[] | undefined, tmdb: MediaItem[], max = 20): MediaItem[] {
+    const pinnedIds = new Set(pinned?.map((p) => p.id) ?? []);
+    const filtered = tmdb.filter((i) => !pinnedIds.has(i.id));
+    return [...(pinned ?? []), ...filtered].slice(0, max);
+  }
+
+  const pinnedHero = pinnedBySpot.get("hero");
+  const hero = pinnedHero && pinnedHero.length > 0
+    ? pinnedHero.slice(0, 5)
+    : trendingItems.slice(0, 5);
+
   const rows: MediaRow[] = [
-    { id: "trending", title: "Trending Now", subtitle: "What everyone is watching this week", items: trendingItems.slice(0, 20) },
-    { id: "popular-movies", title: "Popular Movies", items: mapListItems(pm.results, "movie").slice(0, 20) },
-    { id: "popular-tv", title: "Popular Shows", items: mapListItems(pt.results, "tv").slice(0, 20) },
-    { id: "top-rated", title: "Top Rated", items: mapListItems(tm.results, "movie").slice(0, 20) },
-    { id: "upcoming", title: "Coming Soon", items: mapListItems(up.results, "movie").slice(0, 20) },
-    { id: "now-playing", title: "In Theaters Now", items: mapListItems(np.results, "movie").slice(0, 20) },
-    { id: "on-the-air", title: "On The Air", items: mapListItems(ota.results, "tv").slice(0, 20) },
+    {
+      id: "trending",
+      title: "Trending Now",
+      subtitle: "What the world is watching this week",
+      items: merge(pinnedBySpot.get("trending"), trendingItems),
+    },
+    {
+      id: "popular-movies",
+      title: "Popular Movies",
+      items: merge(pinnedBySpot.get("popular_movies"), mapListItems(pm.results, "movie")),
+    },
+    {
+      id: "popular-tv",
+      title: "Popular Shows",
+      items: merge(pinnedBySpot.get("popular_tv"), mapListItems(pt.results, "tv")),
+    },
+    {
+      id: "top-rated",
+      title: "Top Rated Movies",
+      items: merge(pinnedBySpot.get("top_rated"), mapListItems(tm.results, "movie")),
+    },
+    {
+      id: "upcoming",
+      title: "Coming Soon",
+      items: merge(pinnedBySpot.get("coming_soon"), mapListItems(up.results, "movie")),
+    },
+    {
+      id: "now-playing",
+      title: "In Theaters Now",
+      items: merge(pinnedBySpot.get("in_theaters"), mapListItems(np.results, "movie")),
+    },
+    {
+      id: "on-the-air",
+      title: "On The Air",
+      items: merge(pinnedBySpot.get("on_the_air"), mapListItems(ota.results, "tv")),
+    },
   ];
 
-  return { hero: trendingItems.slice(0, 5), rows };
+  return { hero, rows };
 });
 
 // ---------------- discover ----------------

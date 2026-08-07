@@ -495,7 +495,7 @@ export const listAllContent = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("media_items")
-      .select("id, title, kind, year, status, tags, overview, poster_path, backdrop_path, rd_torrent_id, tmdb_id, created_at")
+      .select("id, title, kind, year, status, tags, landing_spots, overview, poster_path, backdrop_path, rd_torrent_id, tmdb_id, created_at")
       .order("created_at", { ascending: false });
     return data ?? [];
   });
@@ -548,6 +548,7 @@ export const updateContent = createServerFn({ method: "POST" })
     title?: string;
     overview?: string;
     tags?: string[];
+    landing_spots?: string[];
     status?: string;
     year?: number;
   }) =>
@@ -556,6 +557,7 @@ export const updateContent = createServerFn({ method: "POST" })
       title: z.string().min(1).optional(),
       overview: z.string().optional(),
       tags: z.array(z.string()).optional(),
+      landing_spots: z.array(z.string()).optional(),
       status: z.string().optional(),
       year: z.number().optional(),
     }).parse(d),
@@ -563,10 +565,11 @@ export const updateContent = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await ensureAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const update: { title?: string; overview?: string | null; tags?: string[]; status?: string; year?: number | null } = {};
+    const update: { title?: string; overview?: string | null; tags?: string[]; landing_spots?: string[]; status?: string; year?: number | null } = {};
     if (data.title !== undefined) update.title = data.title;
     if (data.overview !== undefined) update.overview = data.overview;
     if (data.tags !== undefined) update.tags = data.tags;
+    if (data.landing_spots !== undefined) update.landing_spots = data.landing_spots;
     if (data.status !== undefined) update.status = data.status;
     if (data.year !== undefined) update.year = data.year;
     if (Object.keys(update).length === 0) return { ok: true };

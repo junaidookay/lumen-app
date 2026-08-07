@@ -124,6 +124,10 @@ export const importTmdbTitle = createServerFn({ method: "POST" })
     }
 
     const kind = data.mediaType;
+
+    // Auto-set tags from TMDB genres
+    const tmdbGenres: string[] = (detail.genres ?? []).map((g: any) => g.name?.toLowerCase()).filter(Boolean);
+
     const rowData: Record<string, any> = {
       tmdb_id: data.tmdbId,
       kind,
@@ -137,6 +141,7 @@ export const importTmdbTitle = createServerFn({ method: "POST" })
         : null,
       year,
       status: "published",
+      tags: tmdbGenres,
     };
 
     if (isTv) {
@@ -209,6 +214,9 @@ export const batchImportTmdbTitles = createServerFn({ method: "POST" })
         const date = isTv ? detail.first_air_date : detail.release_date;
         const year = date ? Number(String(date).slice(0, 4)) : null;
 
+        // Auto-set tags from TMDB genres
+        const tmdbGenres: string[] = (detail.genres ?? []).map((g: any) => g.name?.toLowerCase()).filter(Boolean);
+
         const episodes: any[] = [];
         if (isTv && detail.seasons) {
           for (const s of detail.seasons) {
@@ -247,6 +255,7 @@ export const batchImportTmdbTitles = createServerFn({ method: "POST" })
             : null,
           year,
           status: "published",
+          tags: tmdbGenres,
         };
         if (isTv) {
           rowData.episodes = episodes;
