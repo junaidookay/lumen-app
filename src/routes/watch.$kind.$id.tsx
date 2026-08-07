@@ -245,30 +245,7 @@ function WatchPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            {hasSources ? (
-              onlySample ? (
-                <div className="aspect-video w-full rounded-3xl border border-white/10 bg-surface flex flex-col items-center justify-center gap-4 p-8 text-center">
-                  <AlertTriangle className="h-12 w-12 text-amber-400" />
-                  <div>
-                    <h3 className="text-lg font-semibold">No playable source found</h3>
-                    <p className="mt-1 text-sm text-muted-foreground max-w-md">
-                      {rdErrors[0] ?? "No Real Debrid source available. The torrent may need to be re-resolved from the admin dashboard."}
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      qc.invalidateQueries({ queryKey: ["playback-sources"] });
-                      refetchSources();
-                    }}
-                    disabled={isResolving}
-                    variant="outline"
-                    className="rounded-full"
-                  >
-                    <RefreshCw className={`mr-2 h-4 w-4 ${isResolving ? "animate-spin" : ""}`} />
-                    {isResolving ? "Resolving..." : "Try again"}
-                  </Button>
-                </div>
-              ) : (
+            {hasSources && !onlySample ? (
                 <VideoPlayer
                   mediaId={item.id}
                   mediaKind={item.kind}
@@ -302,9 +279,28 @@ function WatchPage() {
                       : undefined
                   }
                 />
-              )
             ) : (
-              <div className="aspect-video w-full animate-pulse rounded-3xl bg-white/5" />
+              <div className="aspect-video w-full rounded-3xl border border-white/10 bg-surface flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <AlertTriangle className="h-12 w-12 text-amber-400" />
+                <div>
+                  <h3 className="text-lg font-semibold">No playable source found</h3>
+                  <p className="mt-1 text-sm text-muted-foreground max-w-md">
+                    {rdErrors[0] ?? "No Real Debrid source available. The torrent may need to be re-resolved from the admin dashboard."}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => {
+                    qc.invalidateQueries({ queryKey: ["playback-sources"] });
+                    refetchSources();
+                  }}
+                  disabled={isResolving}
+                  variant="outline"
+                  className="rounded-full"
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 ${isResolving ? "animate-spin" : ""}`} />
+                  {isResolving ? "Resolving..." : "Try again"}
+                </Button>
+              </div>
             )}
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">

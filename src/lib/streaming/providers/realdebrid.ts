@@ -64,19 +64,20 @@ export const realDebridProvider: StreamingProvider = {
 
     // Query content — if rd_links column doesn't exist yet, fall back
     let content: any = null;
-    try {
-      const result = await supabaseAdmin
-        .from("media_items")
-        .select("id, kind, rd_torrent_id, rd_info_hash, rd_links, rd_selected_file, episodes, video_url, title")
-        .eq("id", req.mediaId)
-        .single();
-      content = result.data;
-    } catch {
-      const result = await supabaseAdmin
+    const result = await supabaseAdmin
+      .from("media_items")
+      .select("id, kind, rd_torrent_id, rd_info_hash, rd_links, rd_selected_file, episodes, video_url, title")
+      .eq("id", req.mediaId)
+      .single();
+    if (result.error || !result.data) {
+      // rd_links column may not exist — query without it
+      const fallback = await supabaseAdmin
         .from("media_items")
         .select("id, kind, rd_torrent_id, rd_info_hash, episodes, video_url, title")
         .eq("id", req.mediaId)
         .single();
+      content = fallback.data;
+    } else {
       content = result.data;
     }
 
@@ -91,18 +92,17 @@ export const realDebridProvider: StreamingProvider = {
 
     // TV: check season-level rd_links first
     if (content.kind === "tv" && req.season != null) {
-      try {
-        const result = await (supabaseAdmin as any)
-          .from("media_item_seasons")
-          .select("rd_links, rd_selected_file")
-          .eq("media_item_id", req.mediaId)
-          .eq("season_number", req.season)
-          .single();
-        if (result.data?.rd_links && Array.isArray(result.data.rd_links) && result.data.rd_links.length > 0) {
-          rdLinks = result.data.rd_links;
-          selectedIdx = result.data.rd_selected_file ?? 0;
-        }
-      } catch {}
+      const seasonResult = await (supabaseAdmin as any)
+        .from("media_item_seasons")
+        .select("rd_links, rd_selected_file")
+        .eq("media_item_id", req.mediaId)
+        .eq("season_number", req.season)
+        .single();
+      const seasonRow = seasonResult.data;
+      if (seasonRow?.rd_links && Array.isArray(seasonRow.rd_links) && seasonRow.rd_links.length > 0) {
+        rdLinks = seasonRow.rd_links;
+        selectedIdx = seasonRow.rd_selected_file ?? 0;
+      }
     }
 
     if (rdLinks && rdLinks.length > 0) {
