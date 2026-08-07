@@ -253,7 +253,7 @@ function bestTranscodedUrl(obj: any): string | null {
  *
  * Key name is `apple` NOT `hls`.
  */
-export async function getTranscodedUrl(downloadId: string): Promise<string | null> {
+export async function getTranscodedUrl(downloadId: string, clientIp?: string): Promise<string | null> {
   try {
     const data = await rdFetch<any>(`/streaming/transcode/${downloadId}`, {
       headers: { Authorization: `Bearer ${getApiKey()}` },
