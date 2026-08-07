@@ -6,6 +6,110 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Episode, MediaItem, MediaRow, Season } from "@/types/media";
 
+// ---------------- landing page from DB ----------------
+
+function mapDbItemToMediaItem(row: any): MediaItem {
+  const kind = row.kind as "movie" | "tv";
+  return {
+    id: row.id,
+    kind,
+    title: row.title ?? "Untitled",
+    poster: row.poster_path
+      ? row.poster_path.startsWith("http")
+        ? row.poster_path
+        : `https://image.tmdb.org/t/p/w500${row.poster_path}`
+      : "",
+    backdrop: row.backdrop_path
+      ? row.backdrop_path.startsWith("http")
+        ? row.backdrop_path
+        : `https://image.tmdb.org/t/p/w1280${row.backdrop_path}`
+      : "",
+    overview: row.overview ?? "",
+    genres: row.tags ?? [],
+    runtime: 0,
+    releaseDate: row.year ? `${row.year}-01-01` : "",
+    rating: 0,
+    cast: [],
+  };
+}
+
+const TAG_ROW_MAP: Record<string, { title: string; subtitle?: string }> = {
+  featured: { title: "Featured", subtitle: "Handpicked for you" },
+  trending: { title: "Trending Now", subtitle: "What the world is watching this week" },
+  new: { title: "New Releases", subtitle: "Just dropped" },
+  classic: { title: "Classics", subtitle: "Timeless favorites" },
+  action: { title: "Action", subtitle: "Adrenaline-pumping thrills" },
+  drama: { title: "Drama", subtitle: "Stories that stay with you" },
+  comedy: { title: "Comedy", subtitle: "Good laughs ahead" },
+  horror: { title: "Horror", subtitle: "If you dare" },
+  scifi: { title: "Sci-Fi", subtitle: "Beyond the possible" },
+  romance: { title: "Romance", subtitle: "Love stories" },
+  documentary: { title: "Documentary", subtitle: "Real stories" },
+  animation: { title: "Animation", subtitle: "For all ages" },
+  kids: { title: "Kids", subtitle: "Fun for the little ones" },
+};
+
+export const getLandingContent = createServerFn({ method: "GET" }).handler(async (): Promise<HomePayload | null> => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  const { data: items } = await supabaseAdmin
+    .from("media_items")
+    .select("id, title, kind, year, overview, poster_path, backdrop_path, tags, status")
+    .eq("status", "published")
+    .order("created_at", { ascending: false });
+
+  if (!items || items.length === 0) return null;
+
+  const mapped = items.map(mapDbItemToMediaItem);
+
+  const tagged = new Map<string, MediaItem[]>();
+  const untagged: MediaItem[] = [];
+
+  for (const item of mapped) {
+    const tags: string[] = (item as any).tags ?? [];
+    let placed = false;
+    for (const tag of tags) {
+      if (TAG_ROW_MAP[tag]) {
+        if (!tagged.has(tag)) tagged.set(tag, []);
+        tagged.get(tag)!.push(item);
+        placed = true;
+      }
+    }
+    if (!placed) untagged.push(item);
+  }
+
+  const hero = tagged.get("featured")?.slice(0, 5) ?? mapped.slice(0, 5);
+
+  const rows: MediaRow[] = [];
+
+  for (const tag of Object.keys(TAG_ROW_MAP)) {
+    const items = tagged.get(tag);
+    if (!items || items.length === 0) continue;
+    const meta = TAG_ROW_MAP[tag];
+    rows.push({
+      id: `tag-${tag}`,
+      title: meta.title,
+      subtitle: meta.subtitle,
+      items: items.slice(0, 20),
+    });
+  }
+
+  if (untagged.length > 0) {
+    const movies = untagged.filter((i) => i.kind === "movie");
+    const tv = untagged.filter((i) => i.kind === "tv");
+    if (movies.length > 0) {
+      rows.push({ id: "db-movies", title: "Movies", items: movies.slice(0, 20) });
+    }
+    if (tv.length > 0) {
+      rows.push({ id: "db-tv", title: "TV Shows", items: tv.slice(0, 20) });
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  return { hero, rows };
+});
+
 // ---------------- home ----------------
 
 export interface HomePayload {
@@ -14,6 +118,9 @@ export interface HomePayload {
 }
 
 export const getHome = createServerFn({ method: "GET" }).handler(async (): Promise<HomePayload> => {
+  const dbContent = await getLandingContent();
+  if (dbContent && dbContent.rows.length > 0) return dbContent;
+
   const {
     trending,
     popularMovies,
