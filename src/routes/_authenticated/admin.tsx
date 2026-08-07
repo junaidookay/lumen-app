@@ -58,6 +58,9 @@ import {
   autoResolveContent,
   listMediaItemsForAdmin,
   checkInstantAvailabilityForHashes,
+  listAllContent,
+  updateContentTags,
+  listContentTags,
 } from "@/lib/admin/content-management.functions";
 import { checkRdAccountStatus } from "@/lib/debrid/resolve-stream";
 import { AD_SLOT_LABELS, AD_PROVIDERS } from "@/lib/ads/registry";
@@ -852,61 +855,161 @@ function RealDebrid() {
 // ---------- Content ----------
 function Content() {
   const qc = useQueryClient();
-  const { data } = useQuery({
-    queryKey: ["admin", "homepage"],
-    queryFn: () => getHomepageConfig(),
+  const [filter, setFilter] = useState<"all" | "movie" | "tv">("all");
+  const [search, setSearch] = useState("");
+  const [tagFilter, setTagFilter] = useState<string>("");
+
+  const contentQuery = useQuery({
+    queryKey: ["admin", "content"],
+    queryFn: () => listAllContent(),
   });
-  const [announcement, setAnnouncement] = useState<string>("");
-  const [heroIds, setHeroIds] = useState<string>("");
-  useMemo(() => {
-    if (data) {
-      setAnnouncement((data as any).announcement ?? "");
-      setHeroIds(((data as any).hero_media_ids as unknown[])?.join(", ") ?? "");
-    }
-  }, [data]);
-  const save = useMutation({
-    mutationFn: () =>
-      updateHomepageConfig({
-        data: {
-          announcement: announcement || null,
-          hero_media_ids: heroIds
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-        },
-      }),
+
+  const tagsQuery = useQuery({
+    queryKey: ["admin", "content-tags"],
+    queryFn: () => listContentTags(),
+  });
+
+  const updateTags = useMutation({
+    mutationFn: (v: { mediaItemId: string; tags: string[] }) => updateContentTags({ data: v }),
     onSuccess: () => {
-      toast.success("Homepage updated");
-      qc.invalidateQueries({ queryKey: ["admin", "homepage"] });
+      toast.success("Tags updated");
+      qc.invalidateQueries({ queryKey: ["admin", "content"] });
+      qc.invalidateQueries({ queryKey: ["admin", "content-tags"] });
     },
     onError: (e: any) => toast.error(e?.message),
   });
+
+  const items = (contentQuery.data ?? []).filter((item: any) => {
+    if (filter !== "all" && item.kind !== filter) return false;
+    if (search && !item.title.toLowerCase().includes(search.toLowerCase())) return false;
+    if (tagFilter && !(item.tags ?? []).includes(tagFilter)) return false;
+    return true;
+  });
+
+  const AVAILABLE_TAGS = ["featured", "trending", "new", "classic", "action", "drama", "comedy", "horror", "scifi", "romance", "documentary", "animation", "kids"];
+
+  function toggleTag(item: any, tag: string) {
+    const current = item.tags ?? [];
+    const next = current.includes(tag) ? current.filter((t: string) => t !== tag) : [...current, tag];
+    updateTags.mutate({ mediaItemId: item.id, tags: next });
+  }
+
   return (
-    <div className="max-w-2xl space-y-4 rounded-3xl border border-white/5 glass p-6">
-      <div>
-        <label className="text-sm font-medium">Announcement banner</label>
-        <Textarea
-          value={announcement}
-          onChange={(e) => setAnnouncement(e.target.value)}
-          placeholder="Shown site-wide as an editorial banner"
-          className="mt-2"
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex gap-1 rounded-full border border-white/10 p-1">
+          {(["all", "movie", "tv"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={`rounded-full px-3 py-1 text-xs transition ${filter === f ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              {f === "all" ? "All" : f === "movie" ? "Movies" : "TV Shows"}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          placeholder="Search titles..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-8 w-48 rounded-full border border-white/10 bg-surface px-3 text-sm text-foreground placeholder:text-muted-foreground"
         />
+        <select
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value)}
+          className="h-8 rounded-full border border-white/10 bg-surface px-3 text-sm text-foreground"
+        >
+          <option value="">All tags</option>
+          {AVAILABLE_TAGS.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+        <span className="ml-auto text-xs text-muted-foreground">{items.length} items</span>
       </div>
-      <div>
-        <label className="text-sm font-medium">Featured hero (TMDB IDs — comma separated)</label>
-        <Input
-          value={heroIds}
-          onChange={(e) => setHeroIds(e.target.value)}
-          placeholder="movie:12345, tv:67890"
-          className="mt-2"
-        />
-        <p className="mt-1 text-xs text-muted-foreground">
-          Reserved for editorial override; TMDB remains the source of metadata.
-        </p>
+
+      {/* Content table */}
+      <div className="overflow-x-auto rounded-3xl border border-white/5 glass">
+        <table className="w-full text-sm">
+          <thead className="bg-white/5 text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3 text-left">Title</th>
+              <th className="px-4 py-3 text-left">Type</th>
+              <th className="px-4 py-3 text-left">Year</th>
+              <th className="px-4 py-3 text-left">RD</th>
+              <th className="px-4 py-3 text-left">Tags</th>
+              <th className="px-4 py-3 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item: any) => (
+              <tr key={item.id} className="border-t border-white/5">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    {item.poster_path && (
+                      <img src={item.poster_path} alt="" className="h-10 w-7 rounded object-cover" />
+                    )}
+                    <span className="font-medium">{item.title}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 capitalize">{item.kind}</td>
+                <td className="px-4 py-3">{item.year ?? "—"}</td>
+                <td className="px-4 py-3">
+                  {item.rd_torrent_id ? (
+                    <span className="text-emerald-400">✓</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {(item.tags ?? []).map((tag: string) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(item, tag)}
+                        className="rounded-full bg-brand/20 px-2 py-0.5 text-[10px] font-medium text-brand transition hover:bg-brand/30"
+                      >
+                        {tag} ×
+                      </button>
+                    ))}
+                    <div className="relative group">
+                      <button
+                        type="button"
+                        className="rounded-full border border-dashed border-white/20 px-2 py-0.5 text-[10px] text-muted-foreground transition hover:border-white/40 hover:text-foreground"
+                      >
+                        + tag
+                      </button>
+                      <div className="absolute left-0 top-full z-10 mt-1 hidden w-36 rounded-xl border border-white/10 bg-surface p-1 shadow-lg group-hover:block">
+                        {AVAILABLE_TAGS.filter((t) => !(item.tags ?? []).includes(t)).map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => toggleTag(item, tag)}
+                            className="block w-full rounded-lg px-2 py-1 text-left text-xs text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-3 capitalize">{item.status}</td>
+              </tr>
+            ))}
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  {contentQuery.isLoading ? "Loading..." : "No content found."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-      <Button onClick={() => save.mutate()} disabled={save.isPending}>
-        Save homepage
-      </Button>
     </div>
   );
 }

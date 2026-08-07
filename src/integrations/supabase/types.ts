@@ -215,6 +215,7 @@ export type Database = {
           rd_info_hash: string | null
           rd_torrent_id: string | null
           status: string
+          tags: string[] | null
           title: string
           tmdb_id: number | null
           updated_at: string
@@ -232,6 +233,7 @@ export type Database = {
           rd_info_hash?: string | null
           rd_torrent_id?: string | null
           status?: string
+          tags?: string[] | null
           title: string
           tmdb_id?: number | null
           updated_at?: string
@@ -249,6 +251,7 @@ export type Database = {
           rd_info_hash?: string | null
           rd_torrent_id?: string | null
           status?: string
+          tags?: string[] | null
           title?: string
           tmdb_id?: number | null
           updated_at?: string

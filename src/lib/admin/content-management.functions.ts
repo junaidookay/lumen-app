@@ -483,3 +483,56 @@ export const checkInstantAvailabilityForHashes = createServerFn({ method: "POST"
     const { checkInstantAvailability } = await import("@/lib/debrid/real-debrid");
     return checkInstantAvailability(data.hashes);
   });
+
+// ------------------------------------------------------------------
+// Admin: List all content (movies + TV shows)
+// ------------------------------------------------------------------
+
+export const listAllContent = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await ensureAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("media_items")
+      .select("id, title, kind, year, status, tags, poster_path, rd_torrent_id, tmdb_id, created_at")
+      .order("created_at", { ascending: false });
+    return data ?? [];
+  });
+
+// ------------------------------------------------------------------
+// Admin: Update tags for a media item
+// ------------------------------------------------------------------
+
+export const updateContentTags = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { mediaItemId: string; tags: string[] }) =>
+    z.object({ mediaItemId: z.string().uuid(), tags: z.array(z.string()) }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("media_items")
+      .update({ tags: data.tags })
+      .eq("id", data.mediaItemId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ------------------------------------------------------------------
+// Admin: List all unique tags across content
+// ------------------------------------------------------------------
+
+export const listContentTags = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await ensureAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin.from("media_items").select("tags");
+    const tagSet = new Set<string>();
+    for (const row of data ?? []) {
+      if (Array.isArray(row.tags)) row.tags.forEach((t: string) => tagSet.add(t));
+    }
+    return Array.from(tagSet).sort();
+  });
