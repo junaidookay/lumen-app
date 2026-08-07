@@ -6,110 +6,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Episode, MediaItem, MediaRow, Season } from "@/types/media";
 
-// ---------------- landing page from DB ----------------
-
-function mapDbItemToMediaItem(row: any): MediaItem {
-  const kind = row.kind as "movie" | "tv";
-  return {
-    id: row.id,
-    kind,
-    title: row.title ?? "Untitled",
-    poster: row.poster_path
-      ? row.poster_path.startsWith("http")
-        ? row.poster_path
-        : `https://image.tmdb.org/t/p/w500${row.poster_path}`
-      : "",
-    backdrop: row.backdrop_path
-      ? row.backdrop_path.startsWith("http")
-        ? row.backdrop_path
-        : `https://image.tmdb.org/t/p/w1280${row.backdrop_path}`
-      : "",
-    overview: row.overview ?? "",
-    genres: row.tags ?? [],
-    runtime: 0,
-    releaseDate: row.year ? `${row.year}-01-01` : "",
-    rating: 0,
-    cast: [],
-  };
-}
-
-const TAG_ROW_MAP: Record<string, { title: string; subtitle?: string }> = {
-  featured: { title: "Featured", subtitle: "Handpicked for you" },
-  trending: { title: "Trending Now", subtitle: "What the world is watching this week" },
-  new: { title: "New Releases", subtitle: "Just dropped" },
-  classic: { title: "Classics", subtitle: "Timeless favorites" },
-  action: { title: "Action", subtitle: "Adrenaline-pumping thrills" },
-  drama: { title: "Drama", subtitle: "Stories that stay with you" },
-  comedy: { title: "Comedy", subtitle: "Good laughs ahead" },
-  horror: { title: "Horror", subtitle: "If you dare" },
-  scifi: { title: "Sci-Fi", subtitle: "Beyond the possible" },
-  romance: { title: "Romance", subtitle: "Love stories" },
-  documentary: { title: "Documentary", subtitle: "Real stories" },
-  animation: { title: "Animation", subtitle: "For all ages" },
-  kids: { title: "Kids", subtitle: "Fun for the little ones" },
-};
-
-export const getLandingContent = createServerFn({ method: "GET" }).handler(async (): Promise<HomePayload | null> => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-  const { data: items } = await supabaseAdmin
-    .from("media_items")
-    .select("id, title, kind, year, overview, poster_path, backdrop_path, tags, status")
-    .eq("status", "published")
-    .order("created_at", { ascending: false });
-
-  if (!items || items.length === 0) return null;
-
-  const mapped = items.map(mapDbItemToMediaItem);
-
-  const tagged = new Map<string, MediaItem[]>();
-  const untagged: MediaItem[] = [];
-
-  for (const item of mapped) {
-    const tags: string[] = (item as any).tags ?? [];
-    let placed = false;
-    for (const tag of tags) {
-      if (TAG_ROW_MAP[tag]) {
-        if (!tagged.has(tag)) tagged.set(tag, []);
-        tagged.get(tag)!.push(item);
-        placed = true;
-      }
-    }
-    if (!placed) untagged.push(item);
-  }
-
-  const hero = tagged.get("featured")?.slice(0, 5) ?? mapped.slice(0, 5);
-
-  const rows: MediaRow[] = [];
-
-  for (const tag of Object.keys(TAG_ROW_MAP)) {
-    const items = tagged.get(tag);
-    if (!items || items.length === 0) continue;
-    const meta = TAG_ROW_MAP[tag];
-    rows.push({
-      id: `tag-${tag}`,
-      title: meta.title,
-      subtitle: meta.subtitle,
-      items: items.slice(0, 20),
-    });
-  }
-
-  if (untagged.length > 0) {
-    const movies = untagged.filter((i) => i.kind === "movie");
-    const tv = untagged.filter((i) => i.kind === "tv");
-    if (movies.length > 0) {
-      rows.push({ id: "db-movies", title: "Movies", items: movies.slice(0, 20) });
-    }
-    if (tv.length > 0) {
-      rows.push({ id: "db-tv", title: "TV Shows", items: tv.slice(0, 20) });
-    }
-  }
-
-  if (rows.length === 0) return null;
-
-  return { hero, rows };
-});
-
 // ---------------- home ----------------
 
 export interface HomePayload {
@@ -120,7 +16,6 @@ export interface HomePayload {
 export const getHome = createServerFn({ method: "GET" }).handler(async (): Promise<HomePayload> => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-  // Fetch all published content from DB with landing_spots
   const { data: dbItems } = await supabaseAdmin
     .from("media_items")
     .select("id, title, kind, year, overview, poster_path, backdrop_path, tags, landing_spots")
@@ -131,6 +26,7 @@ export const getHome = createServerFn({ method: "GET" }).handler(async (): Promi
   if (dbItems && dbItems.length > 0) {
     for (const row of dbItems) {
       const spots: string[] = row.landing_spots ?? [];
+      if (spots.length === 0) continue;
       const mediaItem: MediaItem = {
         id: row.id,
         kind: row.kind as "movie" | "tv",
@@ -155,78 +51,31 @@ export const getHome = createServerFn({ method: "GET" }).handler(async (): Promi
     }
   }
 
-  const {
-    trending,
-    popularMovies,
-    popularTV,
-    topRatedMovies,
-    upcomingMovies,
-    nowPlayingMovies,
-    onTheAirTV,
-  } = await import("./tmdb/repositories.server");
-  const { mapListItems } = await import("./tmdb/mappers");
+  const SECTION_META: Record<string, { title: string; subtitle?: string }> = {
+    hero: { title: "Featured" },
+    trending: { title: "Trending Now", subtitle: "What the world is watching this week" },
+    popular_movies: { title: "Popular Movies" },
+    popular_tv: { title: "Popular Shows" },
+    top_rated: { title: "Top Rated Movies" },
+    coming_soon: { title: "Coming Soon" },
+    in_theaters: { title: "In Theaters Now" },
+    on_the_air: { title: "On The Air" },
+  };
 
-  const [tr, pm, pt, tm, up, np, ota] = await Promise.all([
-    trending("all", "week"),
-    popularMovies(),
-    popularTV(),
-    topRatedMovies(),
-    upcomingMovies(),
-    nowPlayingMovies(),
-    onTheAirTV(),
-  ]);
+  const hero = pinnedBySpot.get("hero")?.slice(0, 5) ?? [];
 
-  const trendingItems = mapListItems(tr.results);
-
-  function merge(pinned: MediaItem[] | undefined, tmdb: MediaItem[], max = 20): MediaItem[] {
-    const pinnedIds = new Set(pinned?.map((p) => p.id) ?? []);
-    const filtered = tmdb.filter((i) => !pinnedIds.has(i.id));
-    return [...(pinned ?? []), ...filtered].slice(0, max);
+  const rows: MediaRow[] = [];
+  for (const [spotId, meta] of Object.entries(SECTION_META)) {
+    if (spotId === "hero") continue;
+    const items = pinnedBySpot.get(spotId);
+    if (!items || items.length === 0) continue;
+    rows.push({
+      id: spotId,
+      title: meta.title,
+      subtitle: meta.subtitle,
+      items: items.slice(0, 20),
+    });
   }
-
-  const pinnedHero = pinnedBySpot.get("hero");
-  const hero = pinnedHero && pinnedHero.length > 0
-    ? pinnedHero.slice(0, 5)
-    : trendingItems.slice(0, 5);
-
-  const rows: MediaRow[] = [
-    {
-      id: "trending",
-      title: "Trending Now",
-      subtitle: "What the world is watching this week",
-      items: merge(pinnedBySpot.get("trending"), trendingItems),
-    },
-    {
-      id: "popular-movies",
-      title: "Popular Movies",
-      items: merge(pinnedBySpot.get("popular_movies"), mapListItems(pm.results, "movie")),
-    },
-    {
-      id: "popular-tv",
-      title: "Popular Shows",
-      items: merge(pinnedBySpot.get("popular_tv"), mapListItems(pt.results, "tv")),
-    },
-    {
-      id: "top-rated",
-      title: "Top Rated Movies",
-      items: merge(pinnedBySpot.get("top_rated"), mapListItems(tm.results, "movie")),
-    },
-    {
-      id: "upcoming",
-      title: "Coming Soon",
-      items: merge(pinnedBySpot.get("coming_soon"), mapListItems(up.results, "movie")),
-    },
-    {
-      id: "now-playing",
-      title: "In Theaters Now",
-      items: merge(pinnedBySpot.get("in_theaters"), mapListItems(np.results, "movie")),
-    },
-    {
-      id: "on-the-air",
-      title: "On The Air",
-      items: merge(pinnedBySpot.get("on_the_air"), mapListItems(ota.results, "tv")),
-    },
-  ];
 
   return { hero, rows };
 });

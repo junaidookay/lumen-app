@@ -7,16 +7,13 @@ import { HeroCarousel } from "@/components/hero/HeroCarousel";
 import { MediaRow } from "@/components/sections/MediaRow";
 import { GenreTile } from "@/components/discover/GenreTile";
 import { Button } from "@/components/ui/button";
-import { homeQuery, discoverPageQuery } from "@/services/content";
+import { homeQuery } from "@/services/content";
 import { STATIC_GENRES } from "@/constants/genres";
 import { SITE } from "@/constants/site";
 
 export const Route = createFileRoute("/")({
   loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(homeQuery()),
-      context.queryClient.ensureQueryData(discoverPageQuery()),
-    ]),
+    context.queryClient.ensureQueryData(homeQuery()),
   component: Landing,
 });
 
@@ -64,17 +61,22 @@ const FAQ = [
 
 function Landing() {
   const { data: home } = useSuspenseQuery(homeQuery());
-  const { data: discover } = useSuspenseQuery(discoverPageQuery());
-  const trendingRow = home.rows.find((r) => r.id === "trending") ?? home.rows[0];
-  const popularMovies = home.rows.find((r) => r.id === "popular-movies");
-  const popularTV = home.rows.find((r) => r.id === "popular-tv");
-  const topRatedMovies = home.rows.find((r) => r.id === "top-rated");
-  const comingSoon = home.rows.find((r) => r.id === "upcoming");
-  const inTheaters = home.rows.find((r) => r.id === "now-playing");
-  const onTheAir = home.rows.find((r) => r.id === "on-the-air");
+
+  const findRow = (id: string) => home.rows.find((r) => r.id === id);
+
+  const sections = [
+    findRow("trending"),
+    findRow("popular_movies"),
+    findRow("popular_tv"),
+    findRow("top_rated"),
+    findRow("coming_soon"),
+    findRow("in_theaters"),
+    findRow("on_the_air"),
+  ].filter((r): r is NonNullable<typeof r> => !!r && r.items.length > 0);
+
   return (
     <AppShell>
-      <HeroCarousel items={home.hero} />
+      {home.hero.length > 0 && <HeroCarousel items={home.hero} />}
 
       {/* Feature strip */}
       <section className="relative -mt-20 px-4 sm:px-6 lg:px-10">
@@ -102,13 +104,9 @@ function Landing() {
       </section>
 
       <div className="space-y-14 py-16">
-        <MediaRow row={{ id: "trending", title: "Trending Now", subtitle: "What the world is watching this week", items: trendingRow?.items ?? [] }} />
-        {popularMovies && <MediaRow row={popularMovies} />}
-        {popularTV && <MediaRow row={popularTV} />}
-        {topRatedMovies && <MediaRow row={topRatedMovies} />}
-        {comingSoon && <MediaRow row={comingSoon} />}
-        {inTheaters && <MediaRow row={inTheaters} />}
-        {onTheAir && <MediaRow row={onTheAir} />}
+        {sections.map((row) => (
+          <MediaRow key={row.id} row={row} />
+        ))}
 
         {/* Genres */}
         <section className="px-4 sm:px-6 lg:px-10">
