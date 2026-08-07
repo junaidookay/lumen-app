@@ -1,17 +1,44 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Link } from "@tanstack/react-router";
-import { Bookmark, Heart, Play, Share2, Star } from "lucide-react";
+import { Bookmark, Heart, Play, Share2, Star, Download } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { MediaItem } from "@/types/media";
 import { TrailerModal } from "@/components/dialogs/TrailerModal";
 import { ShareDialog } from "@/components/dialogs/ShareDialog";
 import { WatchlistButton } from "@/components/library/LibraryButtons";
 import { FavoriteButton } from "@/components/library/LibraryButtons";
+import { usePermissions } from "@/hooks/use-permissions";
+import { isPremium } from "@/lib/permissions";
+import { resolveDownloadUrl } from "@/lib/billing/downloads.functions";
 
 export function MovieHero({ item }: { item: MediaItem }) {
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const { data: perms } = usePermissions();
+  const premium = isPremium(perms);
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const res = await resolveDownloadUrl({
+        data: {
+          contentId: item.id,
+          kind: item.kind === "tv" ? "tv" : "movie",
+          season: 1,
+          episode: 1,
+        },
+      });
+      window.open(res.url, "_blank");
+      toast.success(`Downloading ${res.title}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Download failed");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <section className="relative isolate min-h-[90vh] w-full overflow-hidden">
@@ -60,6 +87,18 @@ export function MovieHero({ item }: { item: MediaItem }) {
                   <Play className="mr-2 h-4 w-4 fill-current" /> Play now
                 </Link>
               </Button>
+              {premium && (
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  className="rounded-full glass border border-white/10 hover:bg-white/10"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  {downloading ? "Resolving..." : "Download"}
+                </Button>
+              )}
               {item.trailers?.length ? (
                 <Button size="lg" variant="secondary" onClick={() => setTrailerOpen(true)} className="rounded-full glass border border-white/10 hover:bg-white/10">
                   Watch trailer

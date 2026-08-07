@@ -1,9 +1,40 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion } from "motion/react";
-import { Play, Star } from "lucide-react";
+import { Play, Star, Download } from "lucide-react";
+import { toast } from "sonner";
 import type { Episode } from "@/types/media";
+import { usePermissions } from "@/hooks/use-permissions";
+import { isPremium } from "@/lib/permissions";
+import { resolveDownloadUrl } from "@/lib/billing/downloads.functions";
 
 export function EpisodeCard({ episode, index = 0 }: { episode: Episode; index?: number }) {
+  const [downloading, setDownloading] = useState(false);
+  const { data: perms } = usePermissions();
+  const premium = isPremium(perms);
+
+  async function handleDownload(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDownloading(true);
+    try {
+      const res = await resolveDownloadUrl({
+        data: {
+          contentId: episode.showId,
+          kind: "tv",
+          season: episode.seasonNumber,
+          episode: episode.episodeNumber,
+        },
+      });
+      window.open(res.url, "_blank");
+      toast.success(`Downloading ${res.title} E${episode.episodeNumber}`);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Download failed");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -42,6 +73,17 @@ export function EpisodeCard({ episode, index = 0 }: { episode: Episode; index?: 
           </div>
           <h3 className="mt-1 text-base font-semibold tracking-tight">{episode.title}</h3>
           <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{episode.overview}</p>
+          {premium && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+            >
+              <Download className="h-3 w-3" />
+              {downloading ? "Resolving..." : "Download"}
+            </button>
+          )}
         </div>
       </Link>
     </motion.div>
