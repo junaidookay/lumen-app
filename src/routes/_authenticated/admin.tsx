@@ -1069,7 +1069,7 @@ function Content() {
 
       {/* Edit dialog */}
       <Dialog open={!!editingItem} onOpenChange={(o) => { if (!o) setEditingItem(null); }}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Content</DialogTitle>
             <DialogDescription>
