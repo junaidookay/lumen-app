@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
-import { AlertTriangle, ChevronLeft, RefreshCw } from "lucide-react";
+import { AlertTriangle, ChevronLeft, Loader2, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { VideoPlayer } from "@/components/player/VideoPlayer";
 import { SeasonSelector } from "@/components/tv/SeasonSelector";
@@ -245,7 +245,12 @@ function WatchPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            {hasSources && !onlySample ? (
+            {isResolving && !hasSources ? (
+              <div className="aspect-video w-full rounded-3xl border border-white/10 bg-surface flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <Loader2 className="h-10 w-10 animate-spin text-white/80" />
+                <p className="text-sm text-muted-foreground">Resolving stream...</p>
+              </div>
+            ) : hasSources && !onlySample ? (
                 <VideoPlayer
                   mediaId={item.id}
                   mediaKind={item.kind}

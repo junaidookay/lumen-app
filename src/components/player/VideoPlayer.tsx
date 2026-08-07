@@ -142,6 +142,27 @@ export function VideoPlayer(props: VideoPlayerProps) {
   const [buffering, setBuffering] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pendingErrorRef = useRef<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleError = useCallback((msg: string) => {
+    // If we already have a pending error or visible error, don't downgrade
+    if (error && !pendingErrorRef.current) return;
+    pendingErrorRef.current = msg;
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => {
+      setError(pendingErrorRef.current);
+      pendingErrorRef.current = null;
+    }, 60_000);
+  }, [error]);
+
+  const clearScheduledError = useCallback(() => {
+    pendingErrorRef.current = null;
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+  }, []);
   const [fullscreen, setFullscreen] = useState(false);
   const [theater, setTheater] = useState(false);
   const [pip, setPip] = useState(false);
@@ -167,6 +188,13 @@ export function VideoPlayer(props: VideoPlayerProps) {
     resumedRef.current = false;
   }, [initialSource]);
 
+  // Cleanup error timer on unmount
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    };
+  }, []);
+
   // Load source into <video> — hls.js for .m3u8, native for MP4/native-HLS
   useEffect(() => {
     const video = videoRef.current;
@@ -174,6 +202,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
 
     let cancelled = false;
     setError(null);
+    clearScheduledError();
     setLoading(true);
     setHlsLevels([]);
     setHlsAudioTracks([]);
@@ -253,7 +282,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
             tryFallback("Playback error — trying next source…");
           });
         } catch (err) {
-          if (!cancelled) setError((err as Error).message || "Failed to load stream.");
+          if (!cancelled) scheduleError((err as Error).message || "Failed to load stream.");
         }
       })();
     } else if (isDash && typeof MediaSource !== "undefined") {
@@ -320,10 +349,10 @@ export function VideoPlayer(props: VideoPlayerProps) {
         setSource(next);
         onPreferenceChange?.({ preferredSourceId: next.id });
       } else {
-        setError(message);
+        scheduleError(message);
       }
     },
-    [source, sources, onPreferenceChange],
+    [source, sources, onPreferenceChange, scheduleError],
   );
 
   // Wire native video events
@@ -372,6 +401,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
     const onPlayEv = () => {
       setPlaying(true);
       setGlobalPlaybackState(true);
+      clearScheduledError();
       requestWakeLock();
       updateMediaSession({
         title,
@@ -410,7 +440,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
       setVolume(v.volume);
       setMuted(v.muted);
     };
-    const onError = () => tryFallback("Source unavailable — trying next source…");
+    const onError = () => scheduleError("Source unavailable — stream could not be loaded.");
     v.addEventListener("loadedmetadata", onLoaded);
     v.addEventListener("timeupdate", onTime);
     v.addEventListener("play", onPlayEv);
@@ -433,7 +463,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
       v.removeEventListener("volumechange", onVolumeChange);
       v.removeEventListener("error", onError);
     };
-  }, [source, resumeSeconds, preferences.playbackSpeed, mediaId, mediaKind, season, episode, upNext, onProgress, onCompleted, tryFallback, title, subtitle, poster]);
+  }, [source, resumeSeconds, preferences.playbackSpeed, mediaId, mediaKind, season, episode, upNext, onProgress, onCompleted, tryFallback, title, subtitle, poster, clearScheduledError]);
 
   // Auto-hide controls while playing
   const showControls = useCallback(() => {
