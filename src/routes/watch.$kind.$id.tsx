@@ -27,16 +27,11 @@ export const Route = createFileRoute("/watch/$kind/$id")({
     episode: Number(s.episode) || 1,
   }),
   loader: async ({ params, context }) => {
-    try {
-      if (params.kind === "movie") {
-        await context.queryClient.ensureQueryData(movieQuery(params.id));
-      } else if (params.kind === "tv") {
-        await context.queryClient.ensureQueryData(showQuery(params.id));
-      } else {
-        throw notFound();
-      }
-    } catch {
-      throw notFound();
+    if (params.kind !== "movie" && params.kind !== "tv") throw notFound();
+    if (params.kind === "movie") {
+      await context.queryClient.ensureQueryData(movieQuery(params.id));
+    } else {
+      await context.queryClient.ensureQueryData(showQuery(params.id));
     }
   },
   head: () => ({ meta: [{ title: "Watch — Watch Box" }, { name: "robots", content: "noindex" }] }),

@@ -17,7 +17,7 @@ export function MovieHero({ item }: { item: MediaItem }) {
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const { data: perms } = usePermissions();
+  const { data: perms, isLoading: permsLoading } = usePermissions();
   const premium = isPremium(perms);
 
   async function handleDownload() {
@@ -95,11 +95,11 @@ export function MovieHero({ item }: { item: MediaItem }) {
                 size="lg"
                 variant="secondary"
                 onClick={handleDownload}
-                disabled={downloading}
+                disabled={downloading || permsLoading}
                 className="rounded-full glass border border-white/10 hover:bg-white/10"
               >
                 <Download className="mr-2 h-4 w-4" />
-                {downloading ? "Resolving..." : "Download"}
+                {permsLoading ? "Loading..." : downloading ? "Resolving..." : "Download"}
               </Button>
               {item.trailers?.length ? (
                 <Button size="lg" variant="secondary" onClick={() => setTrailerOpen(true)} className="rounded-full glass border border-white/10 hover:bg-white/10">
