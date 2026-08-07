@@ -5,7 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { addMagnet, selectFiles, getTorrentInfo } from "../debrid/real-debrid";
+import { addMagnet, selectFiles } from "../debrid/real-debrid";
 import { searchTorrents, scoreTorrent, isTitleRelevant } from "../debrid/torrent-search";
 import { buildTvEpisodesFromTorrentInfo } from "../debrid/episode-parser";
 
@@ -86,9 +86,14 @@ export const resolveMagnetForContent = createServerFn({ method: "POST" })
     const { id: torrentId } = await addMagnet(data.magnet);
     await selectFiles(torrentId);
 
-    // Wait for processing
-    await new Promise((r) => setTimeout(r, 3000));
-    const torrentInfo = await getTorrentInfo(torrentId);
+    // Poll until torrent is ready (up to 60s)
+    const { waitForTorrent } = await import("../debrid/real-debrid");
+    let torrentInfo: any;
+    try {
+      torrentInfo = await waitForTorrent(torrentId);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Torrent not ready" };
+    }
 
     // Build episodes if TV
     const { data: content } = await supabaseAdmin
@@ -199,8 +204,14 @@ export const resolveMagnetForSeason = createServerFn({ method: "POST" })
 
     const { id: torrentId } = await addMagnet(data.magnet);
     await selectFiles(torrentId);
-    await new Promise((r) => setTimeout(r, 3000));
-    const torrentInfo = await getTorrentInfo(torrentId);
+
+    const { waitForTorrent } = await import("../debrid/real-debrid");
+    let torrentInfo: any;
+    try {
+      torrentInfo = await waitForTorrent(torrentId);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Torrent not ready" };
+    }
 
     let episodes = buildTvEpisodesFromTorrentInfo(torrentInfo);
     // Filter to only episodes matching this season
@@ -208,25 +219,19 @@ export const resolveMagnetForSeason = createServerFn({ method: "POST" })
     // Enrich with existing TMDB titles
     episodes = await enrichWithExistingTitles(supabaseAdmin, data.mediaItemId, episodes);
 
-    // Pre-unrestrict all links and store in rd_links
+    // Store restricted links (unrestrict at playback)
     let rdLinks: any[] | null = null;
     if (torrentInfo.status === "downloaded" && torrentInfo.links?.length > 0) {
-      const { unrestrictLink } = await import("../debrid/real-debrid");
       rdLinks = [];
       for (let i = 0; i < torrentInfo.links.length; i++) {
-        try {
-          const unrestricted = await unrestrictLink(torrentInfo.links[i]);
-          rdLinks.push({
-            index: i,
-            filename: torrentInfo.files?.[i]?.path ?? `file_${i}`,
-            download: unrestricted.download,
-            filesize: unrestricted.filesize ?? 0,
-            mimeType: unrestricted.mimeType ?? "",
-            streamable: unrestricted.streamable ?? 0,
-          });
-        } catch {
-          // Skip failed links
-        }
+        rdLinks.push({
+          index: i,
+          filename: torrentInfo.files?.[i]?.path ?? `file_${i}`,
+          restrictedLink: torrentInfo.links[i],
+          filesize: torrentInfo.files?.[i]?.bytes ?? 0,
+          mimeType: "",
+          streamable: 0,
+        });
       }
     }
 
@@ -457,8 +462,14 @@ export const autoResolveContent = createServerFn({ method: "POST" })
     // Add to RD
     const { id: torrentId } = await addMagnet(best.magnet);
     await selectFiles(torrentId);
-    await new Promise((r) => setTimeout(r, 3000));
-    const torrentInfo = await getTorrentInfo(torrentId);
+
+    const { waitForTorrent } = await import("../debrid/real-debrid");
+    let torrentInfo: any;
+    try {
+      torrentInfo = await waitForTorrent(torrentId);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Torrent not ready" };
+    }
 
     // Build episodes if TV
     let episodes: any[] | undefined;
@@ -473,31 +484,20 @@ export const autoResolveContent = createServerFn({ method: "POST" })
     };
     if (episodes && episodes.length > 0) update.episodes = episodes;
 
-    // Pre-unrestrict all links and store in rd_links
+    // Store restricted links (IP-locked to current server IP) — unrestrict at playback
     if (torrentInfo.status === "downloaded" && torrentInfo.links?.length > 0) {
-      const { unrestrictLink } = await import("../debrid/real-debrid");
       const rdLinks: any[] = [];
       for (let i = 0; i < torrentInfo.links.length; i++) {
-        try {
-          const unrestricted = await unrestrictLink(torrentInfo.links[i]);
-          rdLinks.push({
-            index: i,
-            filename: torrentInfo.files?.[i]?.path ?? `file_${i}`,
-            download: unrestricted.download,
-            filesize: unrestricted.filesize ?? 0,
-            mimeType: unrestricted.mimeType ?? "",
-            streamable: unrestricted.streamable ?? 0,
-          });
-        } catch {
-          // Skip failed links
-        }
+        rdLinks.push({
+          index: i,
+          filename: torrentInfo.files?.[i]?.path ?? `file_${i}`,
+          restrictedLink: torrentInfo.links[i],
+          filesize: torrentInfo.files?.[i]?.bytes ?? 0,
+          mimeType: "",
+          streamable: 0,
+        });
       }
-      if (rdLinks.length > 0) {
-        update.rd_links = rdLinks;
-        if (data.type === "movie") {
-          update.video_url = rdLinks[0].download;
-        }
-      }
+      if (rdLinks.length > 0) update.rd_links = rdLinks;
     }
 
     await supabaseAdmin.from("media_items").update(update).eq("id", data.contentId);

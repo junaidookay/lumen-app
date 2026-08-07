@@ -12,7 +12,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { getTorrentInfo, unrestrictLink, getTranscodedUrl, findDownloadId } from "./real-debrid";
+import { getTorrentInfo, unrestrictLink, getTranscodedUrl, findDownloadId, waitForTorrent } from "./real-debrid";
 import {
   buildTvEpisodesFromTorrentInfo,
   findEpisodeLinkIndex,
@@ -38,12 +38,12 @@ function getClientIp(): string | undefined {
 // ---- Internal helpers ----
 
 async function readdTorrent(infoHash: string): Promise<{ torrentId?: string; error?: string }> {
-  const { addMagnet, selectFiles } = await import("./real-debrid");
+  const { addMagnet, selectFiles, waitForTorrent } = await import("./real-debrid");
   try {
     const magnet = `magnet:?xt=urn:btih:${infoHash}`;
     const { id } = await addMagnet(magnet);
     await selectFiles(id);
-    await new Promise((r) => setTimeout(r, 2000));
+    await waitForTorrent(id);
     return { torrentId: id };
   } catch (e) {
     return { error: String(e) };
@@ -71,7 +71,7 @@ async function tryParallelTranscode(
   // Try download ID lookup + transcode for each candidate in parallel
   const results = await Promise.allSettled(
     candidates.map(async (cid) => {
-      const downloadId = await findDownloadId(restrictedLink);
+      const downloadId = await findDownloadId(restrictedLink, cid);
       if (!downloadId) throw new Error("no download match");
       const url = await getTranscodedUrl(downloadId);
       if (!url) throw new Error("no transcode url");

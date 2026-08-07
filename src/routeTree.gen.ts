@@ -180,8 +180,8 @@ export interface FileRoutesByFullPath {
   '/library/favorites': typeof AuthenticatedLibraryFavoritesRoute
   '/library/history': typeof AuthenticatedLibraryHistoryRoute
   '/watch/$kind/$id': typeof WatchKindIdRoute
-  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
   '/api/public/pawapay/webhook': typeof ApiPublicPawapayWebhookRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
   '/tv/$id/season/$season/episode/$episode': typeof TvIdSeasonSeasonEpisodeEpisodeRoute
 }
 export interface FileRoutesByTo {
@@ -205,6 +205,7 @@ export interface FileRoutesByTo {
   '/library/favorites': typeof AuthenticatedLibraryFavoritesRoute
   '/library/history': typeof AuthenticatedLibraryHistoryRoute
   '/watch/$kind/$id': typeof WatchKindIdRoute
+  '/api/public/pawapay/webhook': typeof ApiPublicPawapayWebhookRoute
   '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
   '/tv/$id/season/$season/episode/$episode': typeof TvIdSeasonSeasonEpisodeEpisodeRoute
 }
@@ -231,8 +232,8 @@ export interface FileRoutesById {
   '/_authenticated/library/favorites': typeof AuthenticatedLibraryFavoritesRoute
   '/_authenticated/library/history': typeof AuthenticatedLibraryHistoryRoute
   '/watch/$kind/$id': typeof WatchKindIdRoute
-  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
   '/api/public/pawapay/webhook': typeof ApiPublicPawapayWebhookRoute
+  '/api/public/stripe/webhook': typeof ApiPublicStripeWebhookRoute
   '/tv/$id/season/$season/episode/$episode': typeof TvIdSeasonSeasonEpisodeEpisodeRoute
 }
 export interface FileRouteTypes {
@@ -258,8 +259,8 @@ export interface FileRouteTypes {
     | '/library/favorites'
     | '/library/history'
     | '/watch/$kind/$id'
-    | '/api/public/stripe/webhook'
     | '/api/public/pawapay/webhook'
+    | '/api/public/stripe/webhook'
     | '/tv/$id/season/$season/episode/$episode'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -283,8 +284,8 @@ export interface FileRouteTypes {
     | '/library/favorites'
     | '/library/history'
     | '/watch/$kind/$id'
-    | '/api/public/stripe/webhook'
     | '/api/public/pawapay/webhook'
+    | '/api/public/stripe/webhook'
     | '/tv/$id/season/$season/episode/$episode'
   id:
     | '__root__'
@@ -309,8 +310,8 @@ export interface FileRouteTypes {
     | '/_authenticated/library/favorites'
     | '/_authenticated/library/history'
     | '/watch/$kind/$id'
-    | '/api/public/stripe/webhook'
     | '/api/public/pawapay/webhook'
+    | '/api/public/stripe/webhook'
     | '/tv/$id/season/$season/episode/$episode'
   fileRoutesById: FileRoutesById
 }
@@ -327,8 +328,8 @@ export interface RootRouteChildren {
   MovieIdRoute: typeof MovieIdRoute
   TvIdRoute: typeof TvIdRouteWithChildren
   WatchKindIdRoute: typeof WatchKindIdRoute
-  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
   ApiPublicPawapayWebhookRoute: typeof ApiPublicPawapayWebhookRoute
+  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -563,8 +564,8 @@ const rootRouteChildren: RootRouteChildren = {
   MovieIdRoute: MovieIdRoute,
   TvIdRoute: TvIdRouteWithChildren,
   WatchKindIdRoute: WatchKindIdRoute,
-  ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
   ApiPublicPawapayWebhookRoute: ApiPublicPawapayWebhookRoute,
+  ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

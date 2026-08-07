@@ -111,9 +111,26 @@ export const realDebridProvider: StreamingProvider = {
         link = rdLinks.find((l) => l.season === req.season && l.episode === req.episode);
       }
       if (!link) link = rdLinks[selectedIdx] ?? rdLinks[0];
-      if (link?.download) {
-        console.log("[rd-provider] Using pre-resolved rd_link");
-        return [makeSource(content, link.download, link.filename)];
+      if (link) {
+        // Restricted links need unrestrict with client IP; pre-unrestricted links use .download
+        const directUrl = (link as any).restrictedLink || link.download;
+        if (directUrl) {
+          // If it's a restricted link (RD /d/ URL), unrestrict with client IP
+          if ((link as any).restrictedLink) {
+            try {
+              const { unrestrictLink } = await import("../../debrid/real-debrid");
+              const unrestricted = await unrestrictLink((link as any).restrictedLink, req.clientIp);
+              console.log("[rd-provider] Unrestricted stored link with client IP");
+              return [makeSource(content, unrestricted.download, link.filename)];
+            } catch (e) {
+              console.error("[rd-provider] Failed to unrestrict stored link:", e instanceof Error ? e.message : e);
+              // Fall through to dynamic resolution
+            }
+          } else {
+            console.log("[rd-provider] Using pre-resolved rd_link");
+            return [makeSource(content, directUrl, link.filename)];
+          }
+        }
       }
     }
 
@@ -131,13 +148,17 @@ export const realDebridProvider: StreamingProvider = {
         console.error("[rd-provider] getTorrentInfo failed:", e instanceof Error ? e.message : e);
         // Torrent expired — try re-adding from hash
         if (content.rd_info_hash) {
-          const { addMagnet, selectFiles } = await import("../../debrid/real-debrid");
+          const { addMagnet, selectFiles, waitForTorrent } = await import("../../debrid/real-debrid");
           const magnet = `magnet:?xt=urn:btih:${content.rd_info_hash}`;
           console.log("[rd-provider] Re-adding magnet from hash");
           const { id } = await addMagnet(magnet);
           await selectFiles(id);
-          await new Promise((r) => setTimeout(r, 3000));
-          torrentInfo = await getTorrentInfo(id);
+          try {
+            torrentInfo = await waitForTorrent(id);
+          } catch (e) {
+            console.error("[rd-provider] Re-added torrent not ready:", e instanceof Error ? e.message : e);
+            return [];
+          }
           console.log("[rd-provider] Re-added torrent status:", torrentInfo.status);
         } else {
           console.error("[rd-provider] No info hash to re-add");
@@ -176,10 +197,10 @@ export const realDebridProvider: StreamingProvider = {
       console.log("[rd-provider] Filename:", filename);
       console.log("[rd-provider] Streamable:", unrestricted.streamable);
 
-      // MP4/M4V files play natively in browser — no transcoding needed
-      const isNativeMp4 = /\.(mp4|m4v)$/i.test(filename);
-      // MKV/HEVC/AVI need transcoding to play in browser
-      const needsTranscoding = !isNativeMp4 && /\.(mkv|avi|wmv|flv|mov)$/i.test(filename);
+      // H.264 MP4/M4V plays natively in browser — no transcoding needed
+      const isH264Mp4 = /(\.mp4|\.m4v)$/i.test(filename) && /(x264|h264|avc|bluray)/i.test(filename);
+      // Everything else (MKV, HEVC MP4, AVI, etc.) may need transcoding
+      const needsTranscoding = !isH264Mp4;
 
       if (needsTranscoding && unrestricted.streamable === 1) {
         console.log("[rd-provider] File needs transcoding, attempting...");

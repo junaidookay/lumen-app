@@ -156,6 +156,27 @@ export async function addMagnetAndWait(
   throw new Error("Torrent did not become ready in time");
 }
 
+/**
+ * Poll torrent status until ready or failed.
+ * Returns the torrent info when status is "downloaded".
+ * Throws on error/dead status or timeout.
+ */
+export async function waitForTorrent(
+  torrentId: string,
+  maxAttempts = 30,
+  intervalMs = 2000,
+): Promise<RdTorrentInfo> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, intervalMs));
+    const info = await getTorrentInfo(torrentId);
+    if (info.status === "downloaded") return info;
+    if (["error", "magnet_error", "dead", "virus"].includes(info.status)) {
+      throw new Error(`Torrent failed: ${info.status}`);
+    }
+  }
+  throw new Error(`Torrent not ready after ${maxAttempts * intervalMs / 1000}s (last status: checking/downloading)`);
+}
+
 // ---- Downloads list (needed for transcode ID lookup) ----
 
 /**
@@ -177,18 +198,15 @@ export async function getDownloadsList(limit = 500): Promise<any[]> {
  * Find the download ID that matches a given restricted link or download URL.
  * Returns the download ID string suitable for /streaming/transcode/{id}.
  */
-export async function findDownloadId(restrictedLink: string): Promise<string | null> {
+export async function findDownloadId(restrictedLink: string, unrestrictId?: string): Promise<string | null> {
   const downloads = await getDownloadsList(500);
-  // The restricted link looks like https://real-debrid.com/d/SHORTCODE
   const shortCode = restrictedLink.split("/d/")[1]?.split("?")[0]?.split("/")[0];
-  if (!shortCode) return null;
 
   const match = downloads.find((d: any) => {
-    // d.link is the restricted link URL — most reliable match
-    const link = d.link || "";
-    const dl = d.download || "";
-    const generated = d.generated || "";
-    return link.includes(shortCode) || dl.includes(shortCode) || generated.includes(shortCode);
+    return (
+      (shortCode && (d.link?.includes(shortCode) || d.download?.includes(shortCode) || d.generated?.includes(shortCode))) ||
+      (unrestrictId && d.id === unrestrictId)
+    );
   });
   return match?.id ?? null;
 }
@@ -242,12 +260,12 @@ export async function getTranscodedUrl(downloadId: string): Promise<string | nul
     });
     if (!data) return null;
 
-    // Priority: liveMP4 (browser-native) > apple/HLS > dash > h264WebM
+    // Prefer DASH — RD uses DASH with ?t= parameter for instant server-side seeking
     const candidates = [
-      bestTranscodedUrl(data.liveMP4),
-      bestTranscodedUrl(data.apple),
       bestTranscodedUrl(data.dash),
+      bestTranscodedUrl(data.apple),
       bestTranscodedUrl(data.h264WebM),
+      bestTranscodedUrl(data.liveMP4),
     ].filter(Boolean) as string[];
 
     for (const url of candidates) {
