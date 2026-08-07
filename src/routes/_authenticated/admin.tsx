@@ -28,6 +28,14 @@ import { isModerator, isAdmin } from "@/lib/permissions";
 import { UpgradeCTA } from "@/components/feature-gate/FeatureGate";
 import { cn } from "@/lib/utils";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   getPlatformOverview,
   getGrowthSeries,
   listUsers,
@@ -61,6 +69,7 @@ import {
   listAllContent,
   updateContentTags,
   listContentTags,
+  updateContent,
 } from "@/lib/admin/content-management.functions";
 import { checkRdAccountStatus } from "@/lib/debrid/resolve-stream";
 import { AD_SLOT_LABELS, AD_PROVIDERS } from "@/lib/ads/registry";
@@ -858,6 +867,14 @@ function Content() {
   const [filter, setFilter] = useState<"all" | "movie" | "tv">("all");
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState<string>("");
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState<{ title: string; overview: string; year: string; status: string; tags: string[] }>({
+    title: "",
+    overview: "",
+    year: "",
+    status: "published",
+    tags: [],
+  });
 
   const contentQuery = useQuery({
     queryKey: ["admin", "content"],
@@ -869,12 +886,13 @@ function Content() {
     queryFn: () => listContentTags(),
   });
 
-  const updateTags = useMutation({
-    mutationFn: (v: { mediaItemId: string; tags: string[] }) => updateContentTags({ data: v }),
+  const updateContentMut = useMutation({
+    mutationFn: (v: any) => updateContent({ data: v }),
     onSuccess: () => {
-      toast.success("Tags updated");
+      toast.success("Content updated");
       qc.invalidateQueries({ queryKey: ["admin", "content"] });
       qc.invalidateQueries({ queryKey: ["admin", "content-tags"] });
+      setEditingItem(null);
     },
     onError: (e: any) => toast.error(e?.message),
   });
@@ -888,10 +906,34 @@ function Content() {
 
   const AVAILABLE_TAGS = ["featured", "trending", "new", "classic", "action", "drama", "comedy", "horror", "scifi", "romance", "documentary", "animation", "kids"];
 
-  function toggleTag(item: any, tag: string) {
-    const current = item.tags ?? [];
-    const next = current.includes(tag) ? current.filter((t: string) => t !== tag) : [...current, tag];
-    updateTags.mutate({ mediaItemId: item.id, tags: next });
+  function openEdit(item: any) {
+    setEditingItem(item);
+    setEditForm({
+      title: item.title ?? "",
+      overview: item.overview ?? "",
+      year: item.year?.toString() ?? "",
+      status: item.status ?? "published",
+      tags: item.tags ?? [],
+    });
+  }
+
+  function toggleEditTag(tag: string) {
+    setEditForm((prev) => ({
+      ...prev,
+      tags: prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag],
+    }));
+  }
+
+  function saveEdit() {
+    if (!editingItem) return;
+    updateContentMut.mutate({
+      mediaItemId: editingItem.id,
+      title: editForm.title,
+      overview: editForm.overview || null,
+      year: editForm.year ? parseInt(editForm.year) : null,
+      status: editForm.status,
+      tags: editForm.tags,
+    });
   }
 
   return (
@@ -941,6 +983,7 @@ function Content() {
               <th className="px-4 py-3 text-left">RD</th>
               <th className="px-4 py-3 text-left">Tags</th>
               <th className="px-4 py-3 text-left">Status</th>
+              <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -966,43 +1009,23 @@ function Content() {
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
                     {(item.tags ?? []).map((tag: string) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => toggleTag(item, tag)}
-                        className="rounded-full bg-brand/20 px-2 py-0.5 text-[10px] font-medium text-brand transition hover:bg-brand/30"
-                      >
-                        {tag} ×
-                      </button>
+                      <span key={tag} className="rounded-full bg-brand/20 px-2 py-0.5 text-[10px] font-medium text-brand">
+                        {tag}
+                      </span>
                     ))}
-                    <div className="relative group">
-                      <button
-                        type="button"
-                        className="rounded-full border border-dashed border-white/20 px-2 py-0.5 text-[10px] text-muted-foreground transition hover:border-white/40 hover:text-foreground"
-                      >
-                        + tag
-                      </button>
-                      <div className="absolute left-0 top-full z-10 mt-1 hidden w-36 rounded-xl border border-white/10 bg-surface p-1 shadow-lg group-hover:block">
-                        {AVAILABLE_TAGS.filter((t) => !(item.tags ?? []).includes(t)).map((tag) => (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => toggleTag(item, tag)}
-                            className="block w-full rounded-lg px-2 py-1 text-left text-xs text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-                          >
-                            {tag}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 </td>
                 <td className="px-4 py-3 capitalize">{item.status}</td>
+                <td className="px-4 py-3 text-right">
+                  <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
+                    Edit
+                  </Button>
+                </td>
               </tr>
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                   {contentQuery.isLoading ? "Loading..." : "No content found."}
                 </td>
               </tr>
@@ -1010,6 +1033,111 @@ function Content() {
           </tbody>
         </table>
       </div>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editingItem} onOpenChange={(o) => { if (!o) setEditingItem(null); }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Edit Content</DialogTitle>
+            <DialogDescription>
+              {editingItem?.kind === "tv" ? "TV Show" : "Movie"} — {editingItem?.title}
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingItem && (
+            <div className="space-y-4">
+              {/* Poster preview */}
+              <div className="flex gap-4">
+                {editingItem.poster_path && (
+                  <img src={editingItem.poster_path} alt="" className="h-24 w-16 rounded object-cover" />
+                )}
+                {editingItem.backdrop_path && (
+                  <img src={editingItem.backdrop_path} alt="" className="h-24 flex-1 rounded object-cover" />
+                )}
+              </div>
+
+              {/* Title */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Title</label>
+                <Input
+                  value={editForm.title}
+                  onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))}
+                  placeholder="Title"
+                />
+              </div>
+
+              {/* Overview */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Description</label>
+                <Textarea
+                  value={editForm.overview}
+                  onChange={(e) => setEditForm((p) => ({ ...p, overview: e.target.value }))}
+                  placeholder="Description / overview"
+                  rows={4}
+                />
+              </div>
+
+              {/* Year + Status row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Year</label>
+                  <Input
+                    type="number"
+                    value={editForm.year}
+                    onChange={(e) => setEditForm((p) => ({ ...p, year: e.target.value }))}
+                    placeholder="2024"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Status</label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm((p) => ({ ...p, status: e.target.value }))}
+                    className="flex h-9 w-full rounded-md border border-white/10 bg-surface px-3 text-sm text-foreground"
+                  >
+                    <option value="published">Published</option>
+                    <option value="draft">Draft</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Tags</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {AVAILABLE_TAGS.map((tag) => {
+                    const active = editForm.tags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleEditTag(tag)}
+                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                          active
+                            ? "bg-brand text-white"
+                            : "border border-white/20 text-muted-foreground hover:border-white/40 hover:text-foreground"
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingItem(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={saveEdit} disabled={updateContentMut.isPending}>
+                  {updateContentMut.isPending ? "Saving..." : "Save changes"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -495,7 +495,7 @@ export const listAllContent = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("media_items")
-      .select("id, title, kind, year, status, tags, poster_path, rd_torrent_id, tmdb_id, created_at")
+      .select("id, title, kind, year, status, tags, overview, poster_path, backdrop_path, rd_torrent_id, tmdb_id, created_at")
       .order("created_at", { ascending: false });
     return data ?? [];
   });
@@ -535,4 +535,45 @@ export const listContentTags = createServerFn({ method: "GET" })
       if (Array.isArray(row.tags)) row.tags.forEach((t: string) => tagSet.add(t));
     }
     return Array.from(tagSet).sort();
+  });
+
+// ------------------------------------------------------------------
+// Admin: Update content details (title, overview, tags, status)
+// ------------------------------------------------------------------
+
+export const updateContent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: {
+    mediaItemId: string;
+    title?: string;
+    overview?: string;
+    tags?: string[];
+    status?: string;
+    year?: number;
+  }) =>
+    z.object({
+      mediaItemId: z.string().uuid(),
+      title: z.string().min(1).optional(),
+      overview: z.string().optional(),
+      tags: z.array(z.string()).optional(),
+      status: z.string().optional(),
+      year: z.number().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const update: { title?: string; overview?: string | null; tags?: string[]; status?: string; year?: number | null } = {};
+    if (data.title !== undefined) update.title = data.title;
+    if (data.overview !== undefined) update.overview = data.overview;
+    if (data.tags !== undefined) update.tags = data.tags;
+    if (data.status !== undefined) update.status = data.status;
+    if (data.year !== undefined) update.year = data.year;
+    if (Object.keys(update).length === 0) return { ok: true };
+    const { error } = await supabaseAdmin
+      .from("media_items")
+      .update(update)
+      .eq("id", data.mediaItemId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
