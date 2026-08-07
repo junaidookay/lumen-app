@@ -112,15 +112,33 @@ export const resolveMagnetForContent = createServerFn({ method: "POST" })
     if (episodes && episodes.length > 0) {
       update.episodes = episodes;
     }
-    // If movie, set the first video URL
-    if (
-      content?.kind === "movie" &&
-      torrentInfo.status === "downloaded" &&
-      torrentInfo.links?.length > 0
-    ) {
+
+    // Pre-unrestrict all links and store in rd_links (like lumina-stream)
+    if (torrentInfo.status === "downloaded" && torrentInfo.links?.length > 0) {
       const { unrestrictLink } = await import("../debrid/real-debrid");
-      const unrestricted = await unrestrictLink(torrentInfo.links[0]);
-      update.video_url = unrestricted.download;
+      const rdLinks: any[] = [];
+      for (let i = 0; i < torrentInfo.links.length; i++) {
+        try {
+          const unrestricted = await unrestrictLink(torrentInfo.links[i]);
+          rdLinks.push({
+            index: i,
+            filename: torrentInfo.files?.[i]?.path ?? `file_${i}`,
+            download: unrestricted.download,
+            filesize: unrestricted.filesize ?? 0,
+            mimeType: unrestricted.mimeType ?? "",
+            streamable: unrestricted.streamable ?? 0,
+          });
+        } catch {
+          // Skip failed links
+        }
+      }
+      if (rdLinks.length > 0) {
+        update.rd_links = rdLinks;
+        // For movies, also set video_url from first link
+        if (content?.kind === "movie") {
+          update.video_url = rdLinks[0].download;
+        }
+      }
     }
 
     await supabaseAdmin.from("media_items").update(update).eq("id", data.contentId);
@@ -190,6 +208,28 @@ export const resolveMagnetForSeason = createServerFn({ method: "POST" })
     // Enrich with existing TMDB titles
     episodes = await enrichWithExistingTitles(supabaseAdmin, data.mediaItemId, episodes);
 
+    // Pre-unrestrict all links and store in rd_links
+    let rdLinks: any[] | null = null;
+    if (torrentInfo.status === "downloaded" && torrentInfo.links?.length > 0) {
+      const { unrestrictLink } = await import("../debrid/real-debrid");
+      rdLinks = [];
+      for (let i = 0; i < torrentInfo.links.length; i++) {
+        try {
+          const unrestricted = await unrestrictLink(torrentInfo.links[i]);
+          rdLinks.push({
+            index: i,
+            filename: torrentInfo.files?.[i]?.path ?? `file_${i}`,
+            download: unrestricted.download,
+            filesize: unrestricted.filesize ?? 0,
+            mimeType: unrestricted.mimeType ?? "",
+            streamable: unrestricted.streamable ?? 0,
+          });
+        } catch {
+          // Skip failed links
+        }
+      }
+    }
+
     await (supabaseAdmin as any).from("media_item_seasons").upsert(
       {
         media_item_id: data.mediaItemId,
@@ -197,6 +237,7 @@ export const resolveMagnetForSeason = createServerFn({ method: "POST" })
         rd_torrent_id: torrentId,
         rd_info_hash: torrentInfo.hash,
         episodes,
+        rd_links: rdLinks,
         rd_resolved_at: new Date().toISOString(),
       },
       { onConflict: "media_item_id,season_number" },
@@ -431,14 +472,32 @@ export const autoResolveContent = createServerFn({ method: "POST" })
       rd_info_hash: torrentInfo.hash,
     };
     if (episodes && episodes.length > 0) update.episodes = episodes;
-    if (
-      data.type === "movie" &&
-      torrentInfo.status === "downloaded" &&
-      torrentInfo.links?.length > 0
-    ) {
+
+    // Pre-unrestrict all links and store in rd_links
+    if (torrentInfo.status === "downloaded" && torrentInfo.links?.length > 0) {
       const { unrestrictLink } = await import("../debrid/real-debrid");
-      const unrestricted = await unrestrictLink(torrentInfo.links[0]);
-      update.video_url = unrestricted.download;
+      const rdLinks: any[] = [];
+      for (let i = 0; i < torrentInfo.links.length; i++) {
+        try {
+          const unrestricted = await unrestrictLink(torrentInfo.links[i]);
+          rdLinks.push({
+            index: i,
+            filename: torrentInfo.files?.[i]?.path ?? `file_${i}`,
+            download: unrestricted.download,
+            filesize: unrestricted.filesize ?? 0,
+            mimeType: unrestricted.mimeType ?? "",
+            streamable: unrestricted.streamable ?? 0,
+          });
+        } catch {
+          // Skip failed links
+        }
+      }
+      if (rdLinks.length > 0) {
+        update.rd_links = rdLinks;
+        if (data.type === "movie") {
+          update.video_url = rdLinks[0].download;
+        }
+      }
     }
 
     await supabaseAdmin.from("media_items").update(update).eq("id", data.contentId);
@@ -462,7 +521,7 @@ export const listMediaItemsForAdmin = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("media_items")
-      .select("id, title, kind, year, rd_torrent_id")
+      .select("id, title, kind, year, rd_torrent_id, rd_links")
       .order("title");
     return (data ?? []) as Array<{
       id: string;
@@ -470,6 +529,7 @@ export const listMediaItemsForAdmin = createServerFn({ method: "GET" })
       kind: string;
       year: number | null;
       rd_torrent_id: string | null;
+      rd_links: any[] | null;
     }>;
   });
 

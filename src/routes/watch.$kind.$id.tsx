@@ -69,7 +69,7 @@ function WatchPage() {
         quality: s.quality ?? "auto",
         playbackSpeed: Number((s as unknown as { playback_speed?: number }).playback_speed ?? 1),
         preferredProvider:
-          (s as unknown as { preferred_provider?: string }).preferred_provider ?? "sample",
+          (s as unknown as { preferred_provider?: string }).preferred_provider ?? "realdebrid",
       });
     });
   }, [user]);

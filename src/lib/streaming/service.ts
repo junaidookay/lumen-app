@@ -38,5 +38,5 @@ export const DEFAULT_PREFS: PlaybackPreferences = {
   subtitlesEnabled: true,
   quality: "auto",
   playbackSpeed: 1,
-  preferredProvider: "sample",
+  preferredProvider: "realdebrid",
 };

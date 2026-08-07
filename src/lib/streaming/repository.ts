@@ -23,9 +23,6 @@ export async function resolveSources(
   for (const r of results) {
     if (r.status === "fulfilled") {
       sources.push(...r.value);
-      // Check for attached error marker from RD provider
-      const marked = r.value as any;
-      if (marked._error) errors.push(marked._error);
     } else {
       errors.push(`Provider failed: ${r.reason}`);
     }

@@ -214,6 +214,8 @@ export type Database = {
           overview: string | null
           poster_path: string | null
           rd_info_hash: string | null
+          rd_links: Json | null
+          rd_selected_file: number | null
           rd_torrent_id: string | null
           status: string
           tags: string[] | null
@@ -233,6 +235,8 @@ export type Database = {
           overview?: string | null
           poster_path?: string | null
           rd_info_hash?: string | null
+          rd_links?: Json | null
+          rd_selected_file?: number | null
           rd_torrent_id?: string | null
           status?: string
           tags?: string[] | null
@@ -252,6 +256,8 @@ export type Database = {
           overview?: string | null
           poster_path?: string | null
           rd_info_hash?: string | null
+          rd_links?: Json | null
+          rd_selected_file?: number | null
           rd_torrent_id?: string | null
           status?: string
           tags?: string[] | null
