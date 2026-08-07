@@ -208,9 +208,22 @@ export const getMovie = createServerFn({ method: "GET" })
     const { movieDetail, collectionDetail } = await import("./tmdb/repositories.server");
     const { mapMovieDetail, mapListItems } = await import("./tmdb/mappers");
 
-    const d = await movieDetail(data.id);
+    // Look up tmdb_id from DB (id is a UUID, not a TMDB numeric ID)
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: dbItem } = await supabaseAdmin
+      .from("media_items")
+      .select("tmdb_id, kind")
+      .eq("id", data.id)
+      .single();
+
+    const tmdbId = dbItem?.tmdb_id;
+    if (!tmdbId) throw new Error("Movie not found");
+
+    const d = await movieDetail(tmdbId);
     const item = mapMovieDetail(d);
-    const similar = mapListItems(d.similar?.results ?? [], "movie");
+    // Override the TMDB numeric id with our DB UUID so links stay stable
+    item.id = data.id;
+    const similar = mapListItems(d.similar?.results ?? [], "movie").map((s) => ({ ...s, id: data.id === s.id ? s.id : s.id }));
     const recommendations = mapListItems(d.recommendations?.results ?? [], "movie");
 
     let collectionItems: MediaItem[] | null = null;
@@ -235,9 +248,23 @@ export const getShow = createServerFn({ method: "GET" })
   }> => {
     const { tvDetail } = await import("./tmdb/repositories.server");
     const { mapTVDetail, mapListItems } = await import("./tmdb/mappers");
-    const d = await tvDetail(data.id);
+
+    // Look up tmdb_id from DB
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: dbItem } = await supabaseAdmin
+      .from("media_items")
+      .select("tmdb_id")
+      .eq("id", data.id)
+      .single();
+
+    const tmdbId = dbItem?.tmdb_id;
+    if (!tmdbId) throw new Error("Show not found");
+
+    const d = await tvDetail(tmdbId);
+    const item = mapTVDetail(d);
+    item.id = data.id;
     return {
-      item: mapTVDetail(d),
+      item,
       similar: mapListItems(d.similar?.results ?? [], "tv"),
       recommendations: mapListItems(d.recommendations?.results ?? [], "tv"),
     };
@@ -250,7 +277,17 @@ export const getSeason = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<Season> => {
     const { seasonDetail } = await import("./tmdb/repositories.server");
     const { mapSeasonDetail } = await import("./tmdb/mappers");
-    const s = await seasonDetail(data.showId, data.seasonNumber);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: dbItem } = await supabaseAdmin
+      .from("media_items")
+      .select("tmdb_id")
+      .eq("id", data.showId)
+      .single();
+    const tmdbId = dbItem?.tmdb_id;
+    if (!tmdbId) throw new Error("Show not found");
+
+    const s = await seasonDetail(tmdbId, data.seasonNumber);
     return mapSeasonDetail(data.showId, s);
   });
 
@@ -265,7 +302,17 @@ export const getEpisode = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<Episode> => {
     const { episodeDetail } = await import("./tmdb/repositories.server");
     const { mapEpisode } = await import("./tmdb/mappers");
-    const e = await episodeDetail(data.showId, data.seasonNumber, data.episodeNumber);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: dbItem } = await supabaseAdmin
+      .from("media_items")
+      .select("tmdb_id")
+      .eq("id", data.showId)
+      .single();
+    const tmdbId = dbItem?.tmdb_id;
+    if (!tmdbId) throw new Error("Show not found");
+
+    const e = await episodeDetail(tmdbId, data.seasonNumber, data.episodeNumber);
     return mapEpisode(data.showId, e);
   });
 
