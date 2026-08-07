@@ -765,7 +765,6 @@ export function VideoPlayer(props: VideoPlayerProps) {
         poster={poster}
         playsInline
         preload="metadata"
-        crossOrigin="anonymous"
         onLoadedMetadata={(e) => {
           e.currentTarget.removeAttribute("poster");
         }}

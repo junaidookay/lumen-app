@@ -204,7 +204,7 @@ export const realDebridProvider: StreamingProvider = {
 
       if (needsTranscoding && unrestricted.streamable === 1) {
         console.log("[rd-provider] File needs transcoding, attempting...");
-        const downloadId = await findDownloadId(restrictedLink);
+        const downloadId = await findDownloadId(restrictedLink, unrestricted.id);
         console.log("[rd-provider] Download ID:", downloadId);
         if (downloadId) {
           const transcoded = await getTranscodedUrl(downloadId, req.clientIp);
