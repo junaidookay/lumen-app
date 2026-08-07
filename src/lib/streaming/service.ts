@@ -1,16 +1,28 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { resolveSources } from "./repository";
 import type { PlaybackPreferences, StreamRequest, StreamResolution, StreamingSource } from "./types";
 
 /**
  * Playback service — the seam between the UI and the streaming layer.
- * The Watch page and VideoPlayer only import from here.
+ * getPlaybackSources is a server function so providers (RD, embed) can access
+ * Supabase service-role key safely.
  */
-export async function getPlaybackSources(
-  req: StreamRequest,
-  prefs?: Partial<PlaybackPreferences>,
-): Promise<StreamResolution> {
-  return resolveSources(req, prefs);
-}
+export const getPlaybackSources = createServerFn({ method: "GET" })
+  .validator((d: { req: StreamRequest; prefs?: Partial<PlaybackPreferences> }) =>
+    z.object({
+      req: z.object({
+        kind: z.enum(["movie", "tv"]),
+        mediaId: z.string(),
+        season: z.number().optional(),
+        episode: z.number().optional(),
+      }),
+      prefs: z.record(z.unknown()).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    return resolveSources(data.req as StreamRequest, data.prefs as Partial<PlaybackPreferences>);
+  });
 
 /** Pick the next source when the current one fails. */
 export function pickFallback(

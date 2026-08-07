@@ -316,6 +316,19 @@ export const getEpisode = createServerFn({ method: "GET" })
     return mapEpisode(data.showId, e);
   });
 
+// ---------------- resolved seasons ----------------
+
+export const getResolvedSeasons = createServerFn({ method: "GET" })
+  .validator((raw: unknown) => idInput.parse(raw))
+  .handler(async ({ data }): Promise<number[]> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: seasonRows } = await (supabaseAdmin as any)
+      .from("media_item_seasons")
+      .select("season_number")
+      .eq("media_item_id", data.id);
+    return (seasonRows ?? []).map((r: any) => r.season_number);
+  });
+
 // ---------------- search ----------------
 
 const searchInput = z.object({ q: z.string().default(""), page: z.number().int().min(1).max(500).default(1) });

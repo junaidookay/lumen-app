@@ -8,7 +8,7 @@ import { VideoPlayer } from "@/components/player/VideoPlayer";
 import { SeasonSelector } from "@/components/tv/SeasonSelector";
 import { EpisodeCard } from "@/components/tv/EpisodeCard";
 import { SimilarContentRow, RecommendationRow } from "@/components/sections/RecommendationRow";
-import { movieQuery, showQuery, seasonQuery } from "@/services/content";
+import { movieQuery, showQuery, seasonQuery, getResolvedSeasons } from "@/services/content";
 import { getPlaybackSources, DEFAULT_PREFS } from "@/lib/streaming/service";
 import type { PlaybackPreferences } from "@/lib/streaming/types";
 import { useAuth } from "@/hooks/use-auth";
@@ -84,7 +84,7 @@ function WatchPage() {
   );
   const { data: sourcesData } = useQuery({
     queryKey: ["playback-sources", sourceReq, prefs.preferredProvider, prefs.preferredSourceId],
-    queryFn: () => getPlaybackSources(sourceReq, prefs),
+    queryFn: () => getPlaybackSources({ data: { req: sourceReq, prefs } }),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -117,12 +117,8 @@ function WatchPage() {
   const { data: resolvedSeasonRows } = useQuery({
     queryKey: ["resolved-seasons", id],
     queryFn: async () => {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data } = await (supabaseAdmin as any)
-        .from("media_item_seasons")
-        .select("season_number")
-        .eq("media_item_id", id);
-      return data ?? [];
+      const seasonNums = await getResolvedSeasons({ data: { id } });
+      return seasonNums.map((n: number) => ({ season_number: n }));
     },
     enabled: isTV,
   });

@@ -14,6 +14,7 @@ import {
   runSearch,
   getMediaByRefs,
   getTrendingSearches,
+  getResolvedSeasons,
   type DiscoverInput,
 } from "@/lib/content.functions";
 import type { MediaKind } from "@/types/media";
@@ -86,3 +87,5 @@ export const mediaBatchQuery = (refs: { id: string; kind: MediaKind }[]) =>
     staleTime: HOUR,
     enabled: refs.length > 0,
   });
+
+export { getResolvedSeasons };
