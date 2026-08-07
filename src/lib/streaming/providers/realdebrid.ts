@@ -165,15 +165,8 @@ export const realDebridProvider: StreamingProvider = {
         linkIndex = findFirstVideoLinkIndex(torrentInfo);
       }
 
-      // Unrestrict with client IP
-      let clientIp: string | undefined;
-      try {
-        const { getRequest } = await import("@tanstack/react-start/server");
-        const request = getRequest();
-        clientIp = request?.headers?.get("x-forwarded-for")?.split(",")[0]?.trim()
-          ?? request?.headers?.get("x-real-ip")
-          ?? undefined;
-      } catch {}
+      // Use client IP passed from getPlaybackSources (where getRequest() works)
+      const clientIp = req.clientIp;
       console.log("[rd-provider] Client IP:", clientIp ?? "none");
 
       const restrictedLink = torrentInfo.links[linkIndex];

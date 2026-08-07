@@ -66,6 +66,7 @@ export interface StreamRequest {
   mediaId: string;
   season?: number;
   episode?: number;
+  clientIp?: string;
 }
 
 export interface StreamResolution {

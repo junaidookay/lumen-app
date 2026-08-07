@@ -1,12 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { resolveSources } from "./repository";
 import type { PlaybackPreferences, StreamRequest, StreamResolution, StreamingSource } from "./types";
 
 /**
  * Playback service — the seam between the UI and the streaming layer.
- * getPlaybackSources is a server function so providers (RD, embed) can access
- * Supabase service-role key safely.
+ * getPlaybackSources is a server function so providers (RD) can access
+ * Supabase service-role key and client IP safely.
  */
 export const getPlaybackSources = createServerFn({ method: "GET" })
   .validator((d: { req: StreamRequest; prefs?: Partial<PlaybackPreferences> }) =>
@@ -21,7 +22,19 @@ export const getPlaybackSources = createServerFn({ method: "GET" })
     }).parse(d),
   )
   .handler(async ({ data }) => {
-    return resolveSources(data.req as StreamRequest, data.prefs as Partial<PlaybackPreferences>);
+    // Capture client IP here where getRequest() works reliably
+    let clientIp: string | undefined;
+    try {
+      const request = getRequest();
+      clientIp = request?.headers?.get("x-forwarded-for")?.split(",")[0]?.trim()
+        ?? request?.headers?.get("x-real-ip")
+        ?? undefined;
+    } catch {}
+
+    const req = data.req as StreamRequest;
+    req.clientIp = clientIp;
+
+    return resolveSources(req, data.prefs as Partial<PlaybackPreferences>);
   });
 
 /** Pick the next source when the current one fails. */
