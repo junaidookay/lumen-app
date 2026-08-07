@@ -98,8 +98,6 @@ export const importTmdbTitle = createServerFn({ method: "POST" })
     const title = isTv ? detail.name : detail.title;
     const date = isTv ? detail.first_air_date : detail.release_date;
     const year = date ? Number(String(date).slice(0, 4)) : null;
-    const genres = (detail.genres ?? []).map((g: any) => g.name);
-    const runtime = isTv ? (detail.episode_run_time?.[0] ?? 0) : (detail.runtime ?? 0);
 
     // Build episodes JSONB for TV shows
     const episodes: any[] = [];
@@ -138,14 +136,11 @@ export const importTmdbTitle = createServerFn({ method: "POST" })
         ? `https://image.tmdb.org/t/p/w1280${detail.backdrop_path}`
         : null,
       year,
-      genres,
-      runtime,
       status: "published",
     };
 
     if (isTv) {
       rowData.episodes = episodes;
-      rowData.seasons_count = detail.number_of_seasons ?? 0;
     }
 
     const { data: inserted, error } = await (supabaseAdmin as any)
@@ -213,8 +208,6 @@ export const batchImportTmdbTitles = createServerFn({ method: "POST" })
         const title = isTv ? detail.name : detail.title;
         const date = isTv ? detail.first_air_date : detail.release_date;
         const year = date ? Number(String(date).slice(0, 4)) : null;
-        const genres = (detail.genres ?? []).map((g: any) => g.name);
-        const runtime = isTv ? (detail.episode_run_time?.[0] ?? 0) : (detail.runtime ?? 0);
 
         const episodes: any[] = [];
         if (isTv && detail.seasons) {
@@ -253,13 +246,10 @@ export const batchImportTmdbTitles = createServerFn({ method: "POST" })
             ? `https://image.tmdb.org/t/p/w1280${detail.backdrop_path}`
             : null,
           year,
-          genres,
-          runtime,
           status: "published",
         };
         if (isTv) {
           rowData.episodes = episodes;
-          rowData.seasons_count = detail.number_of_seasons ?? 0;
         }
 
         const { data: inserted, error } = await (supabaseAdmin as any)
