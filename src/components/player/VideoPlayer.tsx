@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Hls from "hls.js";
 import type { HlsConfig, Level, MediaPlaylist } from "hls.js";
-import * as dashjs from "dashjs";
+import type { MediaPlayerClass } from "dashjs";
 import {
   Play,
   Pause,
@@ -261,8 +261,9 @@ export function VideoPlayer(props: VideoPlayerProps) {
       const baseUrl = source.url.replace(/\?t=\d+/, "");
       dashBaseUrlRef.current = baseUrl;
       let seekReinitLock = false;
-      const initDash = (url: string) => {
+      const initDash = async (url: string) => {
         if (dashRef.current) { dashRef.current.reset(); dashRef.current = null; }
+        const dashjs = await import("dashjs");
         const player = dashjs.MediaPlayer().create();
         player.updateSettings({
           streaming: { buffer: { bufferTimeAtTopQuality: 30, bufferTimeAtTopQualityLongForm: 60 } },
