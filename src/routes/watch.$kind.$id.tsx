@@ -28,10 +28,14 @@ export const Route = createFileRoute("/watch/$kind/$id")({
   }),
   loader: async ({ params, context }) => {
     if (params.kind !== "movie" && params.kind !== "tv") throw notFound();
-    if (params.kind === "movie") {
-      await context.queryClient.ensureQueryData(movieQuery(params.id));
-    } else {
-      await context.queryClient.ensureQueryData(showQuery(params.id));
+    try {
+      if (params.kind === "movie") {
+        await context.queryClient.ensureQueryData(movieQuery(params.id));
+      } else {
+        await context.queryClient.ensureQueryData(showQuery(params.id));
+      }
+    } catch (e) {
+      console.error("[watch loader] Failed to preload:", e);
     }
   },
   head: () => ({ meta: [{ title: "Watch — Watch Box" }, { name: "robots", content: "noindex" }] }),

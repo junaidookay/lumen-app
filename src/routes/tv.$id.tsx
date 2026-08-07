@@ -10,7 +10,7 @@ import { GalleryCarousel } from "@/components/detail/GalleryCarousel";
 import { SeasonSelector } from "@/components/tv/SeasonSelector";
 import { EpisodeList } from "@/components/tv/EpisodeList";
 import { RecommendationRow, SimilarContentRow } from "@/components/sections/RecommendationRow";
-import { showQuery, seasonQuery } from "@/services/content";
+import { showQuery, seasonQuery, getResolvedSeasons } from "@/services/content";
 
 export const Route = createFileRoute("/tv/$id")({
   loader: async ({ params, context }) => {
@@ -37,12 +37,8 @@ function TVDetail() {
   const { data: resolvedSeasonRows } = useQuery({
     queryKey: ["resolved-seasons", id],
     queryFn: async () => {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data } = await (supabaseAdmin as any)
-        .from("media_item_seasons")
-        .select("season_number")
-        .eq("media_item_id", id);
-      return data ?? [];
+      const seasonNums = await getResolvedSeasons({ data: { id } });
+      return seasonNums.map((n: number) => ({ season_number: n }));
     },
   });
 
