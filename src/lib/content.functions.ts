@@ -265,21 +265,38 @@ export const getMovie = createServerFn({ method: "GET" })
     const { movieDetail, collectionDetail } = await import("./tmdb/repositories.server");
     const { mapMovieDetail, mapListItems } = await import("./tmdb/mappers");
 
-    // Look up tmdb_id from DB (id is a UUID, not a TMDB numeric ID)
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: dbItem } = await supabaseAdmin
-      .from("media_items")
-      .select("tmdb_id, kind")
-      .eq("id", data.id)
-      .single();
 
-    const tmdbId = dbItem?.tmdb_id;
+    // Look up by UUID first, then by tmdb_id (handles /movie/82 style URLs)
+    let dbRow: { id: string; tmdb_id: number } | null = null;
+
+    const byUuid = await supabaseAdmin
+      .from("media_items")
+      .select("id, tmdb_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (byUuid.data?.tmdb_id) {
+      dbRow = byUuid.data;
+    } else {
+      const numId = Number(data.id);
+      if (!isNaN(numId)) {
+        const { data: byTmdb } = await supabaseAdmin
+          .from("media_items")
+          .select("id, tmdb_id")
+          .eq("tmdb_id", numId)
+          .maybeSingle();
+        dbRow = byTmdb;
+      }
+    }
+
+    const tmdbId = dbRow?.tmdb_id;
     if (!tmdbId) throw new Error("Movie not found");
 
     const d = await movieDetail(tmdbId);
     const item = mapMovieDetail(d);
-    // Override the TMDB numeric id with our DB UUID so links stay stable
-    item.id = data.id;
+    // Override with DB UUID so links stay stable
+    if (dbRow?.id) item.id = dbRow.id;
+
     const similar = mapListItems(d.similar?.results ?? [], "movie");
     const recommendations = mapListItems(d.recommendations?.results ?? [], "movie");
 
@@ -311,20 +328,37 @@ export const getShow = createServerFn({ method: "GET" })
     const { tvDetail } = await import("./tmdb/repositories.server");
     const { mapTVDetail, mapListItems } = await import("./tmdb/mappers");
 
-    // Look up tmdb_id from DB
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: dbItem } = await supabaseAdmin
-      .from("media_items")
-      .select("tmdb_id")
-      .eq("id", data.id)
-      .single();
 
-    const tmdbId = dbItem?.tmdb_id;
+    // Look up by UUID first, then by tmdb_id (handles /tv/123 style URLs)
+    let dbRow: { id: string; tmdb_id: number } | null = null;
+
+    const byUuid = await supabaseAdmin
+      .from("media_items")
+      .select("id, tmdb_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (byUuid.data?.tmdb_id) {
+      dbRow = byUuid.data;
+    } else {
+      const numId = Number(data.id);
+      if (!isNaN(numId)) {
+        const { data: byTmdb } = await supabaseAdmin
+          .from("media_items")
+          .select("id, tmdb_id")
+          .eq("tmdb_id", numId)
+          .maybeSingle();
+        dbRow = byTmdb;
+      }
+    }
+
+    const tmdbId = dbRow?.tmdb_id;
     if (!tmdbId) throw new Error("Show not found");
 
     const d = await tvDetail(tmdbId);
     const item = mapTVDetail(d);
-    item.id = data.id;
+    if (dbRow?.id) item.id = dbRow.id;
+
     return {
       item,
       similar: await resolveTmdbIds(mapListItems(d.similar?.results ?? [], "tv")),
