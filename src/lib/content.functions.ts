@@ -254,6 +254,45 @@ async function resolveTmdbIds(items: MediaItem[]): Promise<MediaItem[]> {
     .map((it) => ({ ...it, id: idMap.get(Number(it.id))! }));
 }
 
+/** Fallback: get imported items by genre overlap when TMDB results are insufficient. */
+async function getGenreFallback(
+  currentId: string,
+  genres: string[],
+  kind: "movie" | "tv",
+  limit = 8,
+): Promise<MediaItem[]> {
+  if (genres.length === 0) return [];
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  // Use overlap: items where tags && genres has any overlap
+  const { data: rows } = await supabaseAdmin
+    .from("media_items")
+    .select("id, title, kind, year, overview, poster_path, backdrop_path, tags")
+    .eq("status", "published")
+    .eq("kind", kind)
+    .neq("id", currentId)
+    .overlaps("tags", genres)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (!rows || rows.length === 0) return [];
+  return rows.map((r: any) => ({
+    id: r.id,
+    kind: r.kind,
+    title: r.title ?? "Untitled",
+    poster: r.poster_path
+      ? r.poster_path.startsWith("http") ? r.poster_path : `https://image.tmdb.org/t/p/w500${r.poster_path}`
+      : "",
+    backdrop: r.backdrop_path
+      ? r.backdrop_path.startsWith("http") ? r.backdrop_path : `https://image.tmdb.org/t/p/w1280${r.backdrop_path}`
+      : "",
+    overview: r.overview ?? "",
+    genres: r.tags ?? [],
+    runtime: 0,
+    releaseDate: r.year ? `${r.year}-01-01` : "",
+    rating: 0,
+    cast: [],
+  }));
+}
+
 export const getMovie = createServerFn({ method: "GET" })
   .validator((raw: unknown) => idInput.parse(raw))
   .handler(async ({ data }): Promise<{
@@ -294,11 +333,10 @@ export const getMovie = createServerFn({ method: "GET" })
 
     const d = await movieDetail(tmdbId);
     const item = mapMovieDetail(d);
-    // Override with DB UUID so links stay stable
     if (dbRow?.id) item.id = dbRow.id;
 
-    const similar = mapListItems(d.similar?.results ?? [], "movie");
-    const recommendations = mapListItems(d.recommendations?.results ?? [], "movie");
+    let similar = mapListItems(d.similar?.results ?? [], "movie");
+    let recommendations = mapListItems(d.recommendations?.results ?? [], "movie");
 
     let collectionItems: MediaItem[] | null = null;
     if (d.belongs_to_collection) {
@@ -310,10 +348,29 @@ export const getMovie = createServerFn({ method: "GET" })
       }
     }
 
+    similar = await resolveTmdbIds(similar);
+    recommendations = await resolveTmdbIds(recommendations);
+
+    // Genre fallback: if TMDB results didn't match imported content, pull from same genres
+    if (similar.length < 4) {
+      const fallback = await getGenreFallback(item.id, item.genres, "movie", 8);
+      const existingIds = new Set(similar.map((s) => s.id));
+      for (const fb of fallback) {
+        if (!existingIds.has(fb.id)) similar.push(fb);
+      }
+    }
+    if (recommendations.length < 4) {
+      const fallback = await getGenreFallback(item.id, item.genres, "movie", 8);
+      const existingIds = new Set(recommendations.map((r) => r.id));
+      for (const fb of fallback) {
+        if (!existingIds.has(fb.id)) recommendations.push(fb);
+      }
+    }
+
     return {
       item,
-      similar: await resolveTmdbIds(similar),
-      recommendations: await resolveTmdbIds(recommendations),
+      similar,
+      recommendations,
       collectionItems: collectionItems ? await resolveTmdbIds(collectionItems) : null,
     };
   });
@@ -359,11 +416,26 @@ export const getShow = createServerFn({ method: "GET" })
     const item = mapTVDetail(d);
     if (dbRow?.id) item.id = dbRow.id;
 
-    return {
-      item,
-      similar: await resolveTmdbIds(mapListItems(d.similar?.results ?? [], "tv")),
-      recommendations: await resolveTmdbIds(mapListItems(d.recommendations?.results ?? [], "tv")),
-    };
+    let similar = await resolveTmdbIds(mapListItems(d.similar?.results ?? [], "tv"));
+    let recommendations = await resolveTmdbIds(mapListItems(d.recommendations?.results ?? [], "tv"));
+
+    // Genre fallback: if TMDB results didn't match imported content, pull from same genres
+    if (similar.length < 4) {
+      const fallback = await getGenreFallback(item.id, item.genres, "tv", 8);
+      const existingIds = new Set(similar.map((s) => s.id));
+      for (const fb of fallback) {
+        if (!existingIds.has(fb.id)) similar.push(fb);
+      }
+    }
+    if (recommendations.length < 4) {
+      const fallback = await getGenreFallback(item.id, item.genres, "tv", 8);
+      const existingIds = new Set(recommendations.map((r) => r.id));
+      for (const fb of fallback) {
+        if (!existingIds.has(fb.id)) recommendations.push(fb);
+      }
+    }
+
+    return { item, similar, recommendations };
   });
 
 const seasonInput = z.object({ showId: z.string(), seasonNumber: z.number().int().min(0) });
