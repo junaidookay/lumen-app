@@ -1,10 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#b91c1c"/>
-      <stop offset="100%" style="stop-color:#7c3aed"/>
-    </linearGradient>
-  </defs>
-  <rect width="192" height="192" rx="32" fill="url(#bg)"/>
-  <text x="96" y="130" font-family="Arial, sans-serif" font-size="120" font-weight="bold" fill="white" text-anchor="middle">L</text>
+  <circle cx="96" cy="96" r="96" fill="#F5C518"/>
+  <g transform="translate(36, 36) scale(0.625)">
+    <rect x="10" y="60" width="180" height="120" rx="8" fill="#2C2C2C"/>
+    <rect x="10" y="40" width="180" height="30" rx="4" fill="#3C3C3C"/>
+    <line x1="10" y1="55" x2="190" y2="55" stroke="#555" stroke-width="1"/>
+    <line x1="100" y1="55" x2="100" y2="170" stroke="#555" stroke-width="1"/>
+    <line x1="10" y1="110" x2="190" y2="110" stroke="#555" stroke-width="1"/>
+    <polygon points="10,40 50,10 190,10 190,40" fill="#1C1C1C"/>
+    <rect x="20" y="42" width="20" height="12" rx="2" fill="#888" transform="rotate(-30, 30, 48)"/>
+    <rect x="60" y="38" width="20" height="12" rx="2" fill="#888" transform="rotate(-30, 70, 44)"/>
+    <rect x="100" y="34" width="20" height="12" rx="2" fill="#888" transform="rotate(-30, 110, 40)"/>
+    <rect x="140" y="30" width="20" height="12" rx="2" fill="#888" transform="rotate(-30, 150, 36)"/>
+  </g>
 </svg>
