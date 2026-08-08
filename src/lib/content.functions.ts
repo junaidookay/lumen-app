@@ -236,43 +236,45 @@ export const runDiscover = createServerFn({ method: "GET" })
 
 const idInput = z.object({ id: z.string().min(1) });
 
-/** Resolve TMDB numeric IDs to DB UUIDs, and filter to only imported items. */
-async function resolveTmdbIds(items: MediaItem[]): Promise<MediaItem[]> {
-  if (items.length === 0) return items;
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const tmdbIds = items.map((it) => Number(it.id)).filter((n) => !isNaN(n));
-  if (tmdbIds.length === 0) return [];
-  const { data: rows } = await supabaseAdmin
-    .from("media_items")
-    .select("id, tmdb_id")
-    .in("tmdb_id", tmdbIds);
-  if (!rows || rows.length === 0) return [];
-  const idMap = new Map<number, string>();
-  for (const row of rows) idMap.set(row.tmdb_id, row.id);
-  return items
-    .filter((it) => idMap.has(Number(it.id)))
-    .map((it) => ({ ...it, id: idMap.get(Number(it.id))! }));
-}
-
-/** Fallback: get imported items by genre overlap when TMDB results are insufficient. */
-async function getGenreFallback(
+/** Fetch related content directly from media_items DB (genre-matched, excluding current item). */
+async function getMoreFromDB(
   currentId: string,
-  genres: string[],
   kind: "movie" | "tv",
-  limit = 8,
+  genres: string[] = [],
+  limit = 12,
 ): Promise<MediaItem[]> {
-  if (genres.length === 0) return [];
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  // Use overlap: items where tags && genres has any overlap
-  const { data: rows } = await supabaseAdmin
+
+  // First try genre-matched
+  let query = supabaseAdmin
     .from("media_items")
     .select("id, title, kind, year, overview, poster_path, backdrop_path, tags")
     .eq("status", "published")
     .eq("kind", kind)
-    .neq("id", currentId)
-    .overlaps("tags", genres)
+    .neq("id", currentId);
+
+  if (genres.length > 0) {
+    query = query.overlaps("tags", genres);
+  }
+
+  let { data: rows } = await query
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  // If not enough genre matches, fill with other items of same kind
+  if (!rows || rows.length < limit) {
+    const excludeIds = new Set([currentId, ...(rows ?? []).map((r) => r.id)]);
+    const { data: moreRows } = await supabaseAdmin
+      .from("media_items")
+      .select("id, title, kind, year, overview, poster_path, backdrop_path, tags")
+      .eq("status", "published")
+      .eq("kind", kind)
+      .not("id", "in", `(${[...excludeIds].join(",")})`)
+      .order("created_at", { ascending: false })
+      .limit(limit - (rows?.length ?? 0));
+    rows = [...(rows ?? []), ...(moreRows ?? [])];
+  }
+
   if (!rows || rows.length === 0) return [];
   return rows.map((r: any) => ({
     id: r.id,
@@ -335,9 +337,6 @@ export const getMovie = createServerFn({ method: "GET" })
     const item = mapMovieDetail(d);
     if (dbRow?.id) item.id = dbRow.id;
 
-    let similar = mapListItems(d.similar?.results ?? [], "movie");
-    let recommendations = mapListItems(d.recommendations?.results ?? [], "movie");
-
     let collectionItems: MediaItem[] | null = null;
     if (d.belongs_to_collection) {
       try {
@@ -348,30 +347,15 @@ export const getMovie = createServerFn({ method: "GET" })
       }
     }
 
-    similar = await resolveTmdbIds(similar);
-    recommendations = await resolveTmdbIds(recommendations);
-
-    // Genre fallback: if TMDB results didn't match imported content, pull from same genres
-    if (similar.length < 4) {
-      const fallback = await getGenreFallback(item.id, item.genres, "movie", 8);
-      const existingIds = new Set(similar.map((s) => s.id));
-      for (const fb of fallback) {
-        if (!existingIds.has(fb.id)) similar.push(fb);
-      }
-    }
-    if (recommendations.length < 4) {
-      const fallback = await getGenreFallback(item.id, item.genres, "movie", 8);
-      const existingIds = new Set(recommendations.map((r) => r.id));
-      for (const fb of fallback) {
-        if (!existingIds.has(fb.id)) recommendations.push(fb);
-      }
-    }
+    // Pull related content directly from DB (your imported library, not TMDB)
+    const similar = await getMoreFromDB(item.id, "movie", item.genres, 12);
+    const recommendations = await getMoreFromDB(item.id, "movie", [], 12);
 
     return {
       item,
       similar,
       recommendations,
-      collectionItems: collectionItems ? await resolveTmdbIds(collectionItems) : null,
+      collectionItems,
     };
   });
 
@@ -383,7 +367,7 @@ export const getShow = createServerFn({ method: "GET" })
     recommendations: MediaItem[];
   }> => {
     const { tvDetail } = await import("./tmdb/repositories.server");
-    const { mapTVDetail, mapListItems } = await import("./tmdb/mappers");
+    const { mapTVDetail } = await import("./tmdb/mappers");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -416,24 +400,9 @@ export const getShow = createServerFn({ method: "GET" })
     const item = mapTVDetail(d);
     if (dbRow?.id) item.id = dbRow.id;
 
-    let similar = await resolveTmdbIds(mapListItems(d.similar?.results ?? [], "tv"));
-    let recommendations = await resolveTmdbIds(mapListItems(d.recommendations?.results ?? [], "tv"));
-
-    // Genre fallback: if TMDB results didn't match imported content, pull from same genres
-    if (similar.length < 4) {
-      const fallback = await getGenreFallback(item.id, item.genres, "tv", 8);
-      const existingIds = new Set(similar.map((s) => s.id));
-      for (const fb of fallback) {
-        if (!existingIds.has(fb.id)) similar.push(fb);
-      }
-    }
-    if (recommendations.length < 4) {
-      const fallback = await getGenreFallback(item.id, item.genres, "tv", 8);
-      const existingIds = new Set(recommendations.map((r) => r.id));
-      for (const fb of fallback) {
-        if (!existingIds.has(fb.id)) recommendations.push(fb);
-      }
-    }
+    // Pull related content directly from DB (your imported library, not TMDB)
+    const similar = await getMoreFromDB(item.id, "tv", item.genres, 12);
+    const recommendations = await getMoreFromDB(item.id, "tv", [], 12);
 
     return { item, similar, recommendations };
   });
