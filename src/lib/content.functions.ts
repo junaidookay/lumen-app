@@ -236,22 +236,22 @@ export const runDiscover = createServerFn({ method: "GET" })
 
 const idInput = z.object({ id: z.string().min(1) });
 
-/** Resolve TMDB numeric IDs to DB UUIDs so links to imported content work. */
+/** Resolve TMDB numeric IDs to DB UUIDs, and filter to only imported items. */
 async function resolveTmdbIds(items: MediaItem[]): Promise<MediaItem[]> {
   if (items.length === 0) return items;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const tmdbIds = items.map((it) => Number(it.id)).filter((n) => !isNaN(n));
-  if (tmdbIds.length === 0) return items;
+  if (tmdbIds.length === 0) return [];
   const { data: rows } = await supabaseAdmin
     .from("media_items")
     .select("id, tmdb_id")
     .in("tmdb_id", tmdbIds);
+  if (!rows || rows.length === 0) return [];
   const idMap = new Map<number, string>();
-  for (const row of rows ?? []) idMap.set(row.tmdb_id, row.id);
-  return items.map((it) => {
-    const uuid = idMap.get(Number(it.id));
-    return uuid ? { ...it, id: uuid } : it;
-  });
+  for (const row of rows) idMap.set(row.tmdb_id, row.id);
+  return items
+    .filter((it) => idMap.has(Number(it.id)))
+    .map((it) => ({ ...it, id: idMap.get(Number(it.id))! }));
 }
 
 export const getMovie = createServerFn({ method: "GET" })
