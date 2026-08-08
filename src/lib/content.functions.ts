@@ -15,6 +15,7 @@ export interface HomePayload {
 
 export const getHome = createServerFn({ method: "GET" }).handler(async (): Promise<HomePayload> => {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { HERO_ITEMS, HOME_ROWS } = await import("@/mock/media");
 
   const { data: dbItems } = await supabaseAdmin
     .from("media_items")
@@ -22,7 +23,7 @@ export const getHome = createServerFn({ method: "GET" }).handler(async (): Promi
     .eq("status", "published")
     .order("created_at", { ascending: false });
 
-  const allItems: MediaItem[] = [];
+  const allDbItems: MediaItem[] = [];
   const pinnedBySpot = new Map<string, MediaItem[]>();
 
   if (dbItems && dbItems.length > 0) {
@@ -44,7 +45,7 @@ export const getHome = createServerFn({ method: "GET" }).handler(async (): Promi
         rating: 0,
         cast: [],
       };
-      allItems.push(mediaItem);
+      allDbItems.push(mediaItem);
       const spots: string[] = row.landing_spots ?? [];
       for (const spot of spots) {
         if (!pinnedBySpot.has(spot)) pinnedBySpot.set(spot, []);
@@ -53,66 +54,59 @@ export const getHome = createServerFn({ method: "GET" }).handler(async (): Promi
     }
   }
 
-  const SECTION_META: Record<string, { title: string; subtitle?: string }> = {
-    hero: { title: "Featured" },
-    trending: { title: "Trending Now", subtitle: "What the world is watching this week" },
-    popular_movies: { title: "Popular Movies" },
-    popular_tv: { title: "Popular Shows" },
-    top_rated: { title: "Top Rated Movies" },
-    coming_soon: { title: "Coming Soon" },
-    in_theaters: { title: "In Theaters Now" },
-    on_the_air: { title: "On The Air" },
-  };
+  // Start with mock hero, override with pinned DB items
+  const hero = pinnedBySpot.get("hero")?.slice(0, 5) ?? HERO_ITEMS.slice(0, 5);
 
-  // Hero: use pinned items, or fall back to most recent
-  const hero = pinnedBySpot.get("hero")?.slice(0, 5) ?? allItems.slice(0, 5);
-
+  // Start with mock rows, merge in DB content
   const rows: MediaRow[] = [];
 
-  // Pinned sections first
-  for (const [spotId, meta] of Object.entries(SECTION_META)) {
-    if (spotId === "hero") continue;
-    const items = pinnedBySpot.get(spotId);
-    if (!items || items.length === 0) continue;
-    rows.push({
-      id: spotId,
-      title: meta.title,
-      subtitle: meta.subtitle,
-      items: items.slice(0, 20),
-    });
+  // Mock row ID → landing_spot mapping
+  const mockRowMap: Record<string, string> = {
+    "trending": "trending",
+    "popular-movies": "popular_movies",
+    "popular-tv": "popular_tv",
+    "top-rated": "top_rated",
+    "latest": "coming_soon",
+  };
+
+  for (const mockRow of HOME_ROWS) {
+    const spotId = mockRowMap[mockRow.id] ?? mockRow.id;
+    const pinnedItems = pinnedBySpot.get(spotId);
+
+    if (pinnedItems && pinnedItems.length > 0) {
+      // Pinned DB items replace mock data for this row
+      rows.push({
+        id: mockRow.id,
+        title: mockRow.title,
+        subtitle: mockRow.subtitle,
+        items: pinnedItems.slice(0, 20),
+      });
+    } else {
+      // Use mock data as-is
+      rows.push(mockRow);
+    }
   }
 
-  // Auto-generate rows for unpinned content
-  const pinnedIds = new Set(allItems.filter((item) => {
-    const row = dbItems?.find((r) => r.id === item.id);
-    return row?.landing_spots?.length;
-  }).map((i) => i.id));
-
-  const unpinned = allItems.filter((i) => !pinnedIds.has(i.id));
-  const unpinnedMovies = unpinned.filter((i) => i.kind === "movie");
-  const unpinnedTV = unpinned.filter((i) => i.kind === "tv");
+  // Add DB items that aren't pinned to any spot as extra rows
+  const pinnedIds = new Set(
+    Array.from(pinnedBySpot.values()).flat().map((i) => i.id),
+  );
+  const unpinnedDb = allDbItems.filter((i) => !pinnedIds.has(i.id));
+  const unpinnedMovies = unpinnedDb.filter((i) => i.kind === "movie");
+  const unpinnedTV = unpinnedDb.filter((i) => i.kind === "tv");
 
   if (unpinnedMovies.length > 0) {
     rows.push({
       id: "imported-movies",
-      title: "Movies",
+      title: "Imported Movies",
       items: unpinnedMovies.slice(0, 20),
     });
   }
   if (unpinnedTV.length > 0) {
     rows.push({
       id: "imported-tv",
-      title: "TV Shows",
+      title: "Imported TV Shows",
       items: unpinnedTV.slice(0, 20),
-    });
-  }
-
-  // If still no rows, show all content as a single row
-  if (rows.length === 0 && allItems.length > 0) {
-    rows.push({
-      id: "all-content",
-      title: "All Content",
-      items: allItems.slice(0, 20),
     });
   }
 
