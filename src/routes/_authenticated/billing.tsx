@@ -16,6 +16,7 @@ import {
 import {
   initiatePawaPayCheckout,
   checkPawaPayStatus,
+  getPawaPayPrice,
 } from "@/lib/billing/pawapay.functions";
 import { redeemCode, checkDownloadEligibility } from "@/lib/billing/redemption.functions";
 
@@ -41,6 +42,7 @@ function BillingPage() {
   const billing = useQuery({ queryKey: ["billing", "me"], queryFn: () => getMyBilling() });
   const plans = useQuery({ queryKey: ["billing", "plans"], queryFn: () => listSubscriptionPlans() });
   const downloads = useQuery({ queryKey: ["billing", "downloads"], queryFn: () => checkDownloadEligibility() });
+  const pawapayPrice = useQuery({ queryKey: ["billing", "pawapay-price"], queryFn: () => getPawaPayPrice() });
   const [checkoutBusy, setCheckoutBusy] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"stripe" | "pawapay" | "code">("pawapay");
 
@@ -324,7 +326,7 @@ function BillingPage() {
 
               <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
                 <p className="text-sm font-medium">Premium — 30 days</p>
-                <p className="text-2xl font-semibold">~500 {selectedCountry.currency}</p>
+                <p className="text-2xl font-semibold">~{pawapayPrice.data?.amount ?? 500} {selectedCountry.currency}</p>
                 <p className="text-xs text-muted-foreground">Same price in all countries</p>
               </div>
 

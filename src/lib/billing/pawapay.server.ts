@@ -45,7 +45,21 @@ export function getCountryByCurrency(currency: string) {
   return PAWAPAY_COUNTRIES.find((c) => c.currency === currency.toUpperCase());
 }
 
-export function getPawaPayAmount(currency: string): number {
+export async function getPawaPayAmount(currency: string): Promise<number> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await (supabaseAdmin as any)
+      .from("settings")
+      .select("value")
+      .eq("key", "pawapay_price")
+      .maybeSingle();
+    if (data?.value) {
+      const parsed = parseInt(data.value, 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+  } catch {
+    // Settings table may not exist yet
+  }
   return PAWAPAY_PRICE_CENTS;
 }
 

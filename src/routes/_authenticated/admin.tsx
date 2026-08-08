@@ -57,6 +57,7 @@ import {
   generateRedemptionCodes,
   listRedemptionCodes,
   toggleRedemptionCode,
+  updateRedemptionCode,
 } from "@/lib/billing/redemption.functions";
 import {
   resolveMagnetForContent,
@@ -1565,6 +1566,19 @@ function Codes() {
     onError: (e: any) => toast.error(e?.message),
   });
 
+  const updateMut = useMutation({
+    mutationFn: (v: { codeId: string; maxDownloadsPerDay?: number }) => updateRedemptionCode({ data: v }),
+    onSuccess: () => {
+      toast.success("Updated");
+      setEditingCode(null);
+      qc.invalidateQueries({ queryKey: ["admin", "codes"] });
+    },
+    onError: (e: any) => toast.error(e?.message),
+  });
+
+  const [editingCode, setEditingCode] = useState<any>(null);
+  const [editDownloads, setEditDownloads] = useState(3);
+
   return (
     <div className="space-y-6">
       {/* Generate form */}
@@ -1709,16 +1723,28 @@ function Codes() {
                       />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(c.code);
-                          toast.success("Copied!");
-                        }}
-                        className="text-xs text-brand hover:underline"
-                      >
-                        Copy
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCode(c);
+                            setEditDownloads(c.max_downloads_per_day ?? 3);
+                          }}
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(c.code);
+                            toast.success("Copied!");
+                          }}
+                          className="text-xs text-brand hover:underline"
+                        >
+                          Copy
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1727,11 +1753,43 @@ function Codes() {
           </div>
         )}
       </div>
+
+      {/* Edit Code Dialog */}
+      <Dialog open={!!editingCode} onOpenChange={(v) => { if (!v) setEditingCode(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Code</DialogTitle>
+            <DialogDescription>
+              Update settings for code <span className="font-mono">{editingCode?.code}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-xs text-muted-foreground">Max downloads per day</label>
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={editDownloads}
+                onChange={(e) => setEditDownloads(parseInt(e.target.value) || 3)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditingCode(null)}>Cancel</Button>
+            <Button
+              onClick={() => updateMut.mutate({ codeId: editingCode.id, maxDownloadsPerDay: editDownloads })}
+              disabled={updateMut.isPending}
+            >
+              {updateMut.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
-// ---------- Audit ----------
 function Audit() {
   const { data } = useQuery({ queryKey: ["admin", "audit"], queryFn: () => listAuditLogs() });
   return (
@@ -1966,6 +2024,24 @@ function SettingsTab() {
           <Input placeholder="https://chat.whatsapp.com/..." value={getVal("whatsapp_url")} onChange={(e) => setForm((f) => ({ ...f, whatsapp_url: e.target.value }))} className="flex-1" />
           <Button variant="outline" size="sm" onClick={() => upsertMut.mutate({ key: "whatsapp_url", value: getVal("whatsapp_url") })} disabled={upsertMut.isPending || !getVal("whatsapp_url")}>Save</Button>
         </div>
+      </div>
+
+      <div className="border-t border-white/5 pt-6">
+        <p className="text-xs uppercase tracking-[0.25em] text-brand">Payments</p>
+        <h2 className="text-xl font-semibold mt-2">Subscription Pricing</h2>
+      </div>
+
+      {/* PawaPay Price */}
+      <div className="rounded-2xl border border-white/5 glass p-5 space-y-3">
+        <div>
+          <p className="text-sm font-medium">PawaPay Price (amount per 30 days)</p>
+          <p className="text-xs text-muted-foreground">Amount charged for mobile money payments. Used for all countries (UGX, TZS, NGN, KES, RWF).</p>
+        </div>
+        <div className="flex gap-3">
+          <Input type="number" min={1} placeholder="500" value={getVal("pawapay_price")} onChange={(e) => setForm((f) => ({ ...f, pawapay_price: e.target.value }))} className="w-32" />
+          <Button variant="outline" size="sm" onClick={() => upsertMut.mutate({ key: "pawapay_price", value: getVal("pawapay_price") })} disabled={upsertMut.isPending || !getVal("pawapay_price")}>Save</Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Current: {getVal("pawapay_price") || "500"} (default: 500)</p>
       </div>
     </div>
   );

@@ -134,6 +134,35 @@ export const toggleRedemptionCode = createServerFn({ method: "POST" })
   });
 
 // ------------------------------------------------------------------
+// Admin: Update code settings
+// ------------------------------------------------------------------
+
+export const updateRedemptionCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { codeId: string; maxDownloadsPerDay?: number; durationDays?: number; maxRedemptions?: number | null; expiresAt?: string | null }) =>
+    z.object({
+      codeId: z.string().uuid(),
+      maxDownloadsPerDay: z.number().int().min(1).max(50).optional(),
+      durationDays: z.number().int().min(1).max(365).optional(),
+      maxRedemptions: z.number().int().min(1).max(10000).nullable().optional(),
+      expiresAt: z.string().nullable().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const updates: Record<string, unknown> = {};
+    if (data.maxDownloadsPerDay !== undefined) updates.max_downloads_per_day = data.maxDownloadsPerDay;
+    if (data.durationDays !== undefined) updates.duration_days = data.durationDays;
+    if (data.maxRedemptions !== undefined) updates.max_redemptions = data.maxRedemptions;
+    if (data.expiresAt !== undefined) updates.expires_at = data.expiresAt;
+    if (Object.keys(updates).length === 0) return { ok: true };
+    await supabaseAdmin.from("redemption_codes").update(updates).eq("id", data.codeId);
+    await writeAudit(context.userId, "code.update", { code_id: data.codeId, ...updates });
+    return { ok: true };
+  });
+
+// ------------------------------------------------------------------
 // User: Redeem a code
 // ------------------------------------------------------------------
 

@@ -13,6 +13,16 @@ import {
 } from "./pawapay.server";
 
 // ------------------------------------------------------------------
+// Public: Get PawaPay price (for billing page display)
+// ------------------------------------------------------------------
+
+export const getPawaPayPrice = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const amount = await getPawaPayAmount("UGX");
+    return { amount };
+  });
+
+// ------------------------------------------------------------------
 // User: Initiate a PawaPay payment
 // ------------------------------------------------------------------
 
@@ -30,7 +40,7 @@ export const initiatePawaPayCheckout = createServerFn({ method: "POST" })
     if (!country) throw new Error("Unsupported country");
 
     const depositId = crypto.randomUUID();
-    const amount = getPawaPayAmount(country.currency);
+    const amount = await getPawaPayAmount(country.currency);
 
     const payment = await initiatePawaPayPayment({
       country: country.code,
