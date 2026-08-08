@@ -67,15 +67,21 @@ function Landing() {
     return row ?? { id, title, subtitle, items: [] };
   };
 
-  const sections = [
+  const pinnedSections = [
     findRow("trending", "Trending Now", "What the world is watching this week"),
     findRow("popular_movies", "Popular Movies"),
     findRow("popular_tv", "Popular Shows"),
     findRow("top_rated", "Top Rated Movies"),
     findRow("coming_soon", "Coming Soon"),
-    findRow("in_theaters", "In Theaters Now"),
+    findRow("in_theaters", "In Theater Now"),
     findRow("on_the_air", "On The Air"),
   ];
+
+  // Include auto-generated rows (imported-movies, imported-tv, all-content)
+  const autoRowIds = new Set(["trending", "popular_movies", "popular_tv", "top_rated", "coming_soon", "in_theaters", "on_the_air"]);
+  const autoRows = home.rows.filter((r) => !autoRowIds.has(r.id));
+
+  const allSections = [...pinnedSections, ...autoRows];
 
   return (
     <AppShell>
@@ -107,7 +113,7 @@ function Landing() {
       </section>
 
       <div className="space-y-14 py-16">
-        {sections.map((row) => (
+        {allSections.map((row) => (
           row.items.length > 0
             ? <MediaRow key={row.id} row={row} />
             : (

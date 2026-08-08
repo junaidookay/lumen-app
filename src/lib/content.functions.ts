@@ -22,11 +22,11 @@ export const getHome = createServerFn({ method: "GET" }).handler(async (): Promi
     .eq("status", "published")
     .order("created_at", { ascending: false });
 
+  const allItems: MediaItem[] = [];
   const pinnedBySpot = new Map<string, MediaItem[]>();
+
   if (dbItems && dbItems.length > 0) {
     for (const row of dbItems) {
-      const spots: string[] = row.landing_spots ?? [];
-      if (spots.length === 0) continue;
       const mediaItem: MediaItem = {
         id: row.id,
         kind: row.kind as "movie" | "tv",
@@ -44,6 +44,8 @@ export const getHome = createServerFn({ method: "GET" }).handler(async (): Promi
         rating: 0,
         cast: [],
       };
+      allItems.push(mediaItem);
+      const spots: string[] = row.landing_spots ?? [];
       for (const spot of spots) {
         if (!pinnedBySpot.has(spot)) pinnedBySpot.set(spot, []);
         pinnedBySpot.get(spot)!.push(mediaItem);
@@ -62,9 +64,12 @@ export const getHome = createServerFn({ method: "GET" }).handler(async (): Promi
     on_the_air: { title: "On The Air" },
   };
 
-  const hero = pinnedBySpot.get("hero")?.slice(0, 5) ?? [];
+  // Hero: use pinned items, or fall back to most recent
+  const hero = pinnedBySpot.get("hero")?.slice(0, 5) ?? allItems.slice(0, 5);
 
   const rows: MediaRow[] = [];
+
+  // Pinned sections first
   for (const [spotId, meta] of Object.entries(SECTION_META)) {
     if (spotId === "hero") continue;
     const items = pinnedBySpot.get(spotId);
@@ -74,6 +79,40 @@ export const getHome = createServerFn({ method: "GET" }).handler(async (): Promi
       title: meta.title,
       subtitle: meta.subtitle,
       items: items.slice(0, 20),
+    });
+  }
+
+  // Auto-generate rows for unpinned content
+  const pinnedIds = new Set(allItems.filter((item) => {
+    const row = dbItems?.find((r) => r.id === item.id);
+    return row?.landing_spots?.length;
+  }).map((i) => i.id));
+
+  const unpinned = allItems.filter((i) => !pinnedIds.has(i.id));
+  const unpinnedMovies = unpinned.filter((i) => i.kind === "movie");
+  const unpinnedTV = unpinned.filter((i) => i.kind === "tv");
+
+  if (unpinnedMovies.length > 0) {
+    rows.push({
+      id: "imported-movies",
+      title: "Movies",
+      items: unpinnedMovies.slice(0, 20),
+    });
+  }
+  if (unpinnedTV.length > 0) {
+    rows.push({
+      id: "imported-tv",
+      title: "TV Shows",
+      items: unpinnedTV.slice(0, 20),
+    });
+  }
+
+  // If still no rows, show all content as a single row
+  if (rows.length === 0 && allItems.length > 0) {
+    rows.push({
+      id: "all-content",
+      title: "All Content",
+      items: allItems.slice(0, 20),
     });
   }
 
