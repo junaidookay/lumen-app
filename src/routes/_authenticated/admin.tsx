@@ -73,6 +73,7 @@ import {
   updateContent,
 } from "@/lib/admin/content-management.functions";
 import { checkRdAccountStatus } from "@/lib/debrid/resolve-stream";
+import { fetchTmdbList } from "@/lib/tmdb/tmdb-import.server";
 import { AD_SLOT_LABELS, AD_PROVIDERS } from "@/lib/ads/registry";
 import { listSettings, upsertSetting, uploadSettingFile } from "@/lib/admin/settings.functions";
 import { searchTmdbTitles, batchImportTmdbTitles } from "@/lib/tmdb/tmdb-import.server";
@@ -2057,6 +2058,10 @@ function ImportCenter() {
     mutationFn: (vars: { query: string }) => searchTmdbTitles({ data: vars }),
   });
 
+  const listMut = useMutation({
+    mutationFn: (vars: { list: string }) => fetchTmdbList({ data: vars }),
+  });
+
   const importMut = useMutation({
     mutationFn: (vars: { items: Array<{ tmdbId: number; mediaType: "movie" | "tv" }> }) =>
       batchImportTmdbTitles({ data: vars }),
@@ -2073,12 +2078,19 @@ function ImportCenter() {
     onError: (err: any) => toast.error(err?.message ?? "Import failed"),
   });
 
-  const results = searchMut.data ?? [];
+  const results = listMut.data ?? searchMut.data ?? [];
   const selectedCount = Object.values(selected).filter(Boolean).length;
 
   const handleSearch = () => {
     if (!query.trim()) return;
+    listMut.reset();
     searchMut.mutate({ query: query.trim() });
+  };
+
+  const handleListFetch = (list: string) => {
+    searchMut.reset();
+    setSelected({});
+    listMut.mutate({ list });
   };
 
   const handleImport = () => {
@@ -2089,17 +2101,55 @@ function ImportCenter() {
     importMut.mutate({ items });
   };
 
+  const handleImportAll = () => {
+    const items = results.map((r: any) => ({ tmdbId: r.tmdbId, mediaType: r.mediaType }));
+    if (items.length === 0) return;
+    importMut.mutate({ items });
+  };
+
   const inputCls =
     "h-9 rounded-full border border-white/10 bg-white/5 px-4 text-sm placeholder:text-muted-foreground focus:border-brand focus:outline-none";
+
+  const QUICK_LISTS = [
+    { key: "popular-movies", label: "Popular Movies", icon: "🎬" },
+    { key: "top-rated-movies", label: "Top Rated Movies", icon: "⭐" },
+    { key: "now-playing", label: "Now Playing", icon: "🎭" },
+    { key: "upcoming", label: "Upcoming", icon: "📅" },
+    { key: "popular-tv", label: "Popular TV", icon: "📺" },
+    { key: "top-rated-tv", label: "Top Rated TV", icon: "🏆" },
+    { key: "trending", label: "Trending This Week", icon: "🔥" },
+  ];
 
   return (
     <div className="space-y-6">
       <p className="text-xs uppercase tracking-[0.25em] text-brand">Content</p>
       <h2 className="text-xl font-semibold">Import Center</h2>
 
+      {/* Quick Import */}
       <div className="rounded-2xl border border-white/5 glass p-5 space-y-4">
         <p className="text-xs text-muted-foreground">
-          Search and import movies &amp; TV shows from The Movie Database.
+          Quick import curated lists from The Movie Database.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {QUICK_LISTS.map((l) => (
+            <Button
+              key={l.key}
+              variant="outline"
+              size="sm"
+              disabled={listMut.isPending}
+              onClick={() => handleListFetch(l.key)}
+              className="text-xs"
+            >
+              {listMut.isPending ? "Loading…" : `${l.icon} ${l.label}`}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="rounded-2xl border border-white/5 glass p-5 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Or search for specific movies &amp; TV shows.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <input
@@ -2119,10 +2169,43 @@ function ImportCenter() {
           </Button>
         </div>
 
-        {selectedCount > 0 && (
-          <Button size="sm" disabled={importMut.isPending} onClick={handleImport}>
-            {importMut.isPending ? "Importing…" : `Import ${selectedCount} selected`}
-          </Button>
+        {/* Import buttons */}
+        {results.length > 0 && (
+          <div className="flex gap-2">
+            {selectedCount > 0 && (
+              <Button size="sm" disabled={importMut.isPending} onClick={handleImport}>
+                {importMut.isPending ? "Importing…" : `Import ${selectedCount} selected`}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={importMut.isPending}
+              onClick={handleImportAll}
+            >
+              {importMut.isPending
+                ? "Importing…"
+                : `Import all ${results.length} results`}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const allSelected = results.every(
+                  (r: any) => selected[`${r.tmdbId}-${r.mediaType}`],
+                );
+                const newSel: Record<string, boolean> = {};
+                results.forEach((r: any) => {
+                  newSel[`${r.tmdbId}-${r.mediaType}`] = !allSelected;
+                });
+                setSelected(newSel);
+              }}
+            >
+              {results.every((r: any) => selected[`${r.tmdbId}-${r.mediaType}`])
+                ? "Deselect all"
+                : "Select all"}
+            </Button>
+          </div>
         )}
 
         {results.length > 0 && (
@@ -2161,7 +2244,7 @@ function ImportCenter() {
           </ul>
         )}
 
-        {searchMut.data && results.length === 0 && (
+        {(searchMut.data || listMut.data) && results.length === 0 && (
           <p className="text-sm text-muted-foreground py-4">No results found.</p>
         )}
       </div>

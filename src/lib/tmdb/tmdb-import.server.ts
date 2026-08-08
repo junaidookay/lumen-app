@@ -65,6 +65,52 @@ export const searchTmdbTitles = createServerFn({ method: "POST" })
       });
   });
 
+// ---- Fetch TMDB list (Popular, Top Rated, Trending, etc.) ----
+
+export const fetchTmdbList = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { list: string }) => z.object({ list: z.string() }).parse(d))
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context.supabase, context.userId);
+    const { tmdbFetch } = await import("@/lib/tmdb/client.server");
+
+    const LIST_ENDPOINTS: Record<string, string> = {
+      "popular-movies": "/movie/popular",
+      "top-rated-movies": "/movie/top_rated",
+      "now-playing": "/movie/now_playing",
+      "upcoming": "/movie/upcoming",
+      "popular-tv": "/tv/popular",
+      "top-rated-tv": "/tv/top_rated",
+      "trending": "/trending/all/week",
+    };
+
+    const endpoint = LIST_ENDPOINTS[data.list];
+    if (!endpoint) throw new Error(`Unknown list: ${data.list}`);
+
+    const result = await tmdbFetch<any>(endpoint, {
+      query: { page: 1, language: "en-US" },
+    });
+
+    return (result.results ?? [])
+      .slice(0, 20)
+      .map((r: any) => {
+        const isTv = !!r.first_air_date;
+        const title = isTv ? r.name : r.title;
+        const date = isTv ? r.first_air_date : r.release_date;
+        const year = date ? Number(String(date).slice(0, 4)) : null;
+        return {
+          tmdbId: r.id,
+          mediaType: isTv ? "tv" : "movie",
+          title,
+          year,
+          overview: r.overview ?? null,
+          posterPath: r.poster_path ?? null,
+          backdropPath: r.backdrop_path ?? null,
+          rating: r.vote_average ?? 0,
+        };
+      });
+  });
+
 // ---- Import a single title from TMDB ----
 
 export const importTmdbTitle = createServerFn({ method: "POST" })

@@ -236,6 +236,24 @@ export const runDiscover = createServerFn({ method: "GET" })
 
 const idInput = z.object({ id: z.string().min(1) });
 
+/** Resolve TMDB numeric IDs to DB UUIDs so links to imported content work. */
+async function resolveTmdbIds(items: MediaItem[]): Promise<MediaItem[]> {
+  if (items.length === 0) return items;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const tmdbIds = items.map((it) => Number(it.id)).filter((n) => !isNaN(n));
+  if (tmdbIds.length === 0) return items;
+  const { data: rows } = await supabaseAdmin
+    .from("media_items")
+    .select("id, tmdb_id")
+    .in("tmdb_id", tmdbIds);
+  const idMap = new Map<number, string>();
+  for (const row of rows ?? []) idMap.set(row.tmdb_id, row.id);
+  return items.map((it) => {
+    const uuid = idMap.get(Number(it.id));
+    return uuid ? { ...it, id: uuid } : it;
+  });
+}
+
 export const getMovie = createServerFn({ method: "GET" })
   .validator((raw: unknown) => idInput.parse(raw))
   .handler(async ({ data }): Promise<{
@@ -262,7 +280,7 @@ export const getMovie = createServerFn({ method: "GET" })
     const item = mapMovieDetail(d);
     // Override the TMDB numeric id with our DB UUID so links stay stable
     item.id = data.id;
-    const similar = mapListItems(d.similar?.results ?? [], "movie").map((s) => ({ ...s, id: data.id === s.id ? s.id : s.id }));
+    const similar = mapListItems(d.similar?.results ?? [], "movie");
     const recommendations = mapListItems(d.recommendations?.results ?? [], "movie");
 
     let collectionItems: MediaItem[] | null = null;
@@ -275,7 +293,12 @@ export const getMovie = createServerFn({ method: "GET" })
       }
     }
 
-    return { item, similar, recommendations, collectionItems };
+    return {
+      item,
+      similar: await resolveTmdbIds(similar),
+      recommendations: await resolveTmdbIds(recommendations),
+      collectionItems: collectionItems ? await resolveTmdbIds(collectionItems) : null,
+    };
   });
 
 export const getShow = createServerFn({ method: "GET" })
@@ -304,8 +327,8 @@ export const getShow = createServerFn({ method: "GET" })
     item.id = data.id;
     return {
       item,
-      similar: mapListItems(d.similar?.results ?? [], "tv"),
-      recommendations: mapListItems(d.recommendations?.results ?? [], "tv"),
+      similar: await resolveTmdbIds(mapListItems(d.similar?.results ?? [], "tv")),
+      recommendations: await resolveTmdbIds(mapListItems(d.recommendations?.results ?? [], "tv")),
     };
   });
 
