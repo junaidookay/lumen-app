@@ -55,8 +55,8 @@ export const getMyPermissions = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const [rolesRes, subRes, profileRes] = await Promise.all([
       supabaseAdmin.from("user_roles").select("role").eq("user_id", userId),
-      supabase.from("subscriptions").select("plan_id,status,cancel_at_period_end").eq("user_id", userId).maybeSingle(),
-      supabase.from("profiles").select("is_admin").eq("id", userId).maybeSingle(),
+      supabaseAdmin.from("subscriptions").select("plan_id,status,cancel_at_period_end").eq("user_id", userId).maybeSingle(),
+      supabaseAdmin.from("profiles").select("is_admin").eq("id", userId).maybeSingle(),
     ]);
     let roles = (rolesRes.data ?? []).map((r: any) => r.role);
 
