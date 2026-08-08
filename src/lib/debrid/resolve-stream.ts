@@ -91,6 +91,7 @@ async function resolveFromTorrentInfo(
   season: number | undefined,
   episode: number | undefined,
   clientIp?: string,
+  downloadMode = false,
 ): Promise<{ stream_url?: string; error?: string; retryable?: boolean; episodes?: any[] }> {
   if (torrentInfo.status !== "downloaded") {
     return { error: `Torrent not ready (${torrentInfo.status})`, retryable: true };
@@ -123,7 +124,7 @@ async function resolveFromTorrentInfo(
   const filename =
     torrentInfo.files?.[linkIndex]?.path ?? torrentInfo.files?.[linkIndex]?.name ?? "";
   const isH264Mp4 = /(\.mp4|\.m4v)/.test(filename) && /(x264|h264|avc|bluray)/i.test(filename);
-  if (isH264Mp4) {
+  if (isH264Mp4 || downloadMode) {
     return { stream_url: directUrl };
   }
 
@@ -149,6 +150,7 @@ export const resolveStream = createServerFn({ method: "POST" })
       rdInfoHash?: string;
       episodes?: any[];
       videoEmbedUrl?: string;
+      downloadMode?: boolean;
     }) =>
       z
         .object({
@@ -160,11 +162,12 @@ export const resolveStream = createServerFn({ method: "POST" })
           rdInfoHash: z.string().optional(),
           episodes: z.array(z.any()).optional(),
           videoEmbedUrl: z.string().optional(),
+          downloadMode: z.boolean().optional(),
         })
         .parse(d),
   )
   .handler(async ({ data }): Promise<StreamResolution | RdResolveError> => {
-    const { contentId, kind, season, episode, rdTorrentId, rdInfoHash, episodes, videoEmbedUrl } =
+    const { contentId, kind, season, episode, rdTorrentId, rdInfoHash, episodes, videoEmbedUrl, downloadMode } =
       data;
 
     // Get client IP for unrestrict (RD URLs are IP-locked)
@@ -245,6 +248,7 @@ export const resolveStream = createServerFn({ method: "POST" })
       season,
       episode,
       clientIp,
+      !!downloadMode,
     );
 
     if (result.error) return result as RdResolveError;

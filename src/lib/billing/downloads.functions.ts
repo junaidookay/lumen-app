@@ -88,7 +88,7 @@ export const resolveDownloadUrl = createServerFn({ method: "POST" })
       throw new Error("No download source available for this content");
     }
 
-    // 3. Resolve the stream URL (RD unrestricted URL is a direct download link)
+    // 3. Resolve the direct file URL (downloadMode skips DASH transcoding)
     const result = await resolveStream({
       data: {
         contentId: content.id,
@@ -99,6 +99,7 @@ export const resolveDownloadUrl = createServerFn({ method: "POST" })
         rdInfoHash: rdInfoHash ?? undefined,
         episodes,
         videoEmbedUrl: content.video_url ?? undefined,
+        downloadMode: true,
       },
     });
 
